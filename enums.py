@@ -35,6 +35,14 @@ class EditAction(Enum):
     DISCARD_ALL = -2
 
 
+class CommitRejectAction(Enum):
+    ABORT = 0
+    CONTINUE = 1
+    EDIT = 2
+    DISCARD = 3
+    CLEAR = 4
+
+
 class EditTarget(Enum):
     SKIP = -3
     DISCARD = -2

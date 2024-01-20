@@ -200,7 +200,7 @@ class DataRunManager:
         items_invalid = list(filter(lambda _item: not _item.is_valid(), items))
 
         if print_results:
-            print(f"{prefix} {len(items_valid)} valid items:")
+            print(f"{prefix} {len(items_valid)} valid item(s):")
             for item in sorted(items_valid, key=lambda i: i.name):
                 print(f"\t{item}", end="")
 
@@ -218,7 +218,7 @@ class DataRunManager:
                 print()
 
             if len(items_invalid) > 0:
-                print(f"\n{prefix} {len(items_invalid)} invalid items:")
+                print(f"\n{prefix} {len(items_invalid)} invalid item(s):")
                 for item in sorted(items_invalid, key=lambda i: i.name or "zzz"):
                     print(f"\t{item}")
 
@@ -238,6 +238,11 @@ class DataRunManager:
         except ArithmeticError:
             print(" " * (9 + len(suffix)), end="")
 
+    def sync_item_changes(self):
+        log.debug("syncing item changes")
+        self.buy = list(self.filter_untrusted(self.buy))
+        self.sell = list(self.filter_untrusted(self.sell))
+
     def filter_untrusted(self, items: Sequence[Commodity]) -> list[Commodity]:
         for item in items:
             if item.trust <= 0.0:
@@ -249,16 +254,20 @@ class DataRunManager:
     def current_trade_port_name(self):
         return f"{port['code']}: {port['name']}" if (port := self.trade_port) is not None else None
 
-    def change_trade_port(self, static_data: StaticData):
-        self.trade_port = inquirer.fuzzy(
-            message="Select trade port:",
-            choices=[
-                Choice(port, name=f"{port['code']}: {port['name']}") for port in static_data.trade_port.values()
-            ],
-            default=self.current_trade_port_name(),
-        ).execute()
+    def change_trade_port(self, static_data: StaticData, default: bool = True):
+        try:
+            self.trade_port = inquirer.fuzzy(
+                message="Select trade port:",
+                choices=[
+                    Choice(port, name=f"{port['code']}: {port['name']}") for port in static_data.trade_port.values()
+                ],
+                default=self.current_trade_port_name() if default else None,
+            ).execute()
 
-        self.load()
+            self.load()
+
+        except KeyboardInterrupt:
+            log.debug("aborting trade port change based on user input")
 
     def load(self, update_previous: bool = True) -> dict:
         assert self.trade_port is not None, "trade port must be set"
@@ -635,7 +644,7 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
     return items, image
 
 
-def edit_items(items: Sequence[Commodity], deps: DependencyContainer):
+def edit_items(items: Sequence[Commodity], deps: DependencyContainer) -> Sequence[Commodity]:
     while True:
         items = list(sorted(items, key=lambda item: item.name or "zzz"))
         choices_invalid = [Choice(_id, name=str(item)) for _id, item in enumerate(items) if not item.is_valid()]
@@ -664,13 +673,13 @@ def edit_items(items: Sequence[Commodity], deps: DependencyContainer):
                         if not item.is_valid():
                             item.trust = 0
 
-                    return
+                    break
 
                 case EditAction.DISCARD_ALL:
                     for item in items:
                         item.trust = 0
 
-                    return
+                    break
 
             fix_target: EditTarget = inquirer.select(
                 message="Select an attribute to fix:",
@@ -682,7 +691,7 @@ def edit_items(items: Sequence[Commodity], deps: DependencyContainer):
                     Choice(EditTarget.PRICE, name="Change price"),
                     Choice(EditTarget.STOCK, name="Change stock"),
                 ],
-                default=EditTarget.ALL,
+                default=EditTarget.NAME,
             ).execute()
 
             item = items[item_index]
@@ -718,6 +727,9 @@ def edit_items(items: Sequence[Commodity], deps: DependencyContainer):
 
         finally:
             items = deps.run_manager.filter_untrusted(items)
+            deps.run_manager.sync_item_changes()
+
+    return deps.run_manager.filter_untrusted(items)
 
 
 def edit_item_stock(item):
@@ -818,16 +830,10 @@ def commit(deps: DependencyContainer):
         log.error("no UEX user session found, copy the 'PHPSESSID' cookie value from your browser to %s", session_file.absolute())
         return
 
-    trade_port_station: StaticData.TradePort = inquirer.fuzzy(
-        message="Select actions:",
-        choices=[
-            Choice(port, name=f"{port['code']}: {port['name']}") for port in static_data.trade_port.values()
-        ],
-        default=run_manager.current_trade_port_name(),
-    ).execute()
+    run_manager.change_trade_port(static_data)
 
-    trade_port_code = trade_port_station["code"]
-    trade_port_system = trade_port_station["system_code"]
+    trade_port_code = run_manager.trade_port["code"]
+    trade_port_system = run_manager.trade_port["system_code"]
     run_data = {
         "tradeport": trade_port_code,
         "system": trade_port_system,
@@ -844,14 +850,61 @@ def commit(deps: DependencyContainer):
         **{f"scu_buy[{item.code}]": item.stock for item in run_manager.buy},
     }
 
-    print()
-    run_manager.item_overview(run_manager.buy, prefix="Tracked BUY contains")
-    run_manager.item_overview(run_manager.sell, prefix="Tracked SELL contains")
+    def confirm_submission() -> bool:
+        print()
+        run_manager.item_overview(run_manager.buy, prefix="Tracked BUY contains")
+        run_manager.item_overview(run_manager.sell, prefix="Tracked SELL contains")
+        return inquirer.confirm(message="Proceed with submission?", default=True).execute()
 
-    proceed = inquirer.confirm(message="Proceed with submission?", default=True).execute()
-    if not proceed:
-        log.debug("aborting commit based on user input")
-        return
+    while not confirm_submission():
+        action: CommitRejectAction = inquirer.select(
+            message="Select an action:",
+            choices=[
+                Choice(CommitRejectAction.ABORT, name="Abort submission"),
+                Choice(CommitRejectAction.CONTINUE, name="Continue with submission"),
+                Separator(),
+                Choice(CommitRejectAction.EDIT, name="EDIT entries"),
+                Choice(CommitRejectAction.DISCARD, name="DISCARD selected entries"),
+                Choice(CommitRejectAction.CLEAR, name="CLEAR all entries"),
+            ],
+            default=CommitRejectAction.CONTINUE,
+        ).execute()
+        match action:
+            case CommitRejectAction.EDIT:
+                edit_items(run_manager.buy + run_manager.sell, deps)
+
+            case CommitRejectAction.DISCARD:
+                entries = {
+                    **{("buy", item.code): item for item in run_manager.buy},
+                    **{("sell", item.code): item for item in run_manager.sell},
+                }
+                choices_buy = [Choice(key, name=str(item)) for key, item in entries.items() if key[0] == "buy"]
+                choices_sell = [Choice(key, name=str(item)) for key, item in entries.items() if key[0] == "sell"]
+                keys_to_discard: list[tuple[str, str]] = inquirer.select(
+                    message="Select entries to discard:",
+                    choices=[
+                        *choices_buy,
+                        *([Separator()] if len(choices_buy) and len(choices_sell) else []),
+                        *choices_sell,
+                    ],
+                    multiselect=True,
+                ).execute()
+                for entry_key in keys_to_discard:
+                    entries.get(entry_key).trust = 0
+
+                run_manager.sync_item_changes()
+
+            case CommitRejectAction.CLEAR:
+                run_manager.clear()
+
+            case CommitRejectAction.ABORT:
+                log.debug("aborting submission based on user input")
+                return
+
+        if not run_manager.is_dirty():
+            print("There are no data run changes to commit anymore.")
+            log.info("no changes to commit anymore")
+            return
 
     try:
         headers = {
@@ -926,7 +979,7 @@ def run_choices():
         action = action_prompt.execute()
         match action:
             case Action.CHANGE_TRADE_PORT:
-                deps.run_manager.change_trade_port(deps.static_data)
+                deps.run_manager.change_trade_port(deps.static_data, default=False)
 
             case Action.PROCESS_BUY | Action.PROCESS_SELL:
                 run(action, deps)
