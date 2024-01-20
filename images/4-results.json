@@ -1,0 +1,37 @@
+{
+    "item_count": 8,
+    "valid_item_count": 8,
+    "detected_name_count": 8,
+    "detected_price_count": 8,
+    "detected_stock_count": 8,
+    "data_names": [
+        "Astatine",
+        "Beryl",
+        "Bexalite",
+        "Chlorine",
+        "Copper",
+        "Corundum",
+        "Diamond",
+        "Distilled Spirits"
+    ],
+    "data_prices": [
+        900.0,
+        2815.99998,
+        7462.99982,
+        170.0,
+        372.0,
+        388.0,
+        30200004000.0,
+        555.0
+    ],
+    "data_stocks": [
+        0.0,
+        149.0,
+        0.0,
+        0.0,
+        27.0,
+        0.0,
+        0.0,
+        0.0
+    ]
+}
