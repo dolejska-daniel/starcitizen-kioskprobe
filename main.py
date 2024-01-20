@@ -190,6 +190,16 @@ class DataRunManager:
             if item.code not in result_items or item.trust > result_items[item.code].trust:
                 result_items[item.code] = item
 
+            elif item.trust == result_items[item.code].trust:
+                item_kept: Commodity = inquirer.select(
+                    message="Cannot decide based on trust, select an item to keep:",
+                    choices=[
+                        Choice(item, name=str(item)),
+                        Choice(result_items[item.code], name=str(result_items[item.code])),
+                    ],
+                ).execute()
+                result_items[item_kept.code] = item_kept
+
         return list(result_items.values())
 
     def item_overview(self, items: Sequence[Commodity] | None, print_results: bool = True, prefix: str = "Detected")\
@@ -269,6 +279,12 @@ class DataRunManager:
         except KeyboardInterrupt:
             log.debug("aborting trade port change based on user input")
 
+    def update_previous_buy(self, items: Sequence[Commodity]):
+        self.previous_buy_by_code = {item.code: item for item in items}
+
+    def update_previous_sell(self, items: Sequence[Commodity]):
+        self.previous_sell_by_code = {item.code: item for item in items}
+
     def load(self, update_previous: bool = True) -> dict:
         assert self.trade_port is not None, "trade port must be set"
 
@@ -299,7 +315,7 @@ class DataRunManager:
 
         return data
 
-    def store(self):
+    def store(self, update_from_current: bool = True):
         assert self.trade_port is not None, "trade port must be set"
 
         filepath = Path("stats.pickle")
@@ -307,8 +323,10 @@ class DataRunManager:
 
         data = self.load(update_previous=False)
         with filepath.open("wb") as file:
-            self.previous_buy_by_code = {i.code: i for i in self.buy}
-            self.previous_sell_by_code = {i.code: i for i in self.sell}
+            if update_from_current:
+                self.update_previous_buy(self.buy)
+                self.update_previous_sell(self.sell)
+
             data[self.trade_port["code"]] = {
                 "buy": self.previous_buy_by_code,
                 "sell": self.previous_sell_by_code,
@@ -726,9 +744,10 @@ def edit_items(items: Sequence[Commodity], deps: DependencyContainer) -> Sequenc
             continue
 
         finally:
-            items = deps.run_manager.filter_untrusted(items)
             deps.run_manager.sync_item_changes()
+            items = deps.run_manager.filter_untrusted(items)
 
+    deps.run_manager.sync_item_changes()
     return deps.run_manager.filter_untrusted(items)
 
 
@@ -936,12 +955,25 @@ def commit(deps: DependencyContainer):
         return
 
 
+def manage_previous(deps: DependencyContainer):
+    previous_sells = list(deps.run_manager.previous_sell_by_code.values())
+    previous_buys = list(deps.run_manager.previous_buy_by_code.values())
+    edit_items(previous_sells + previous_buys, deps)
+
+    previous_sells = deps.run_manager.filter_untrusted(previous_sells)
+    deps.run_manager.update_previous_sell(previous_sells)
+
+    previous_buys = deps.run_manager.filter_untrusted(previous_buys)
+    deps.run_manager.update_previous_buy(previous_buys)
+    deps.run_manager.store(update_from_current=False)
+
+
 def run_choices():
     while True:
         action_prompt = inquirer.select(
             message="Select an action:",
             choices=[
-                Choice(Action.CHANGE_TRADE_PORT, name=f"Change trade port ({deps.run_manager.current_trade_port_name()})"),
+                Choice(Action.CHANGE_TRADE_PORT, name=f"Change trade PORT ({deps.run_manager.current_trade_port_name()})"),
                 Choice(Action.PROCESS_BUY, name="Process BUY screenshot"),
                 Choice(Action.PROCESS_SELL, name="Process SELL screenshot"),
                 *([
@@ -950,9 +982,10 @@ def run_choices():
                     Choice(Action.CLEAR, name="CLEAR data run", enabled=deps.run_manager.is_dirty()),
                 ] if deps.run_manager.is_dirty() else []),
                 Separator(),
+                *([Choice(Action.MANAGE_PREVIOUS, name="Manage PREVIOUS data runs")] if deps.run_manager.trade_port is not None else []),
                 Choice(None, name="Exit"),
             ],
-            long_instruction="b=Process BUY, s=Process SELL, f=COMMIT, c=CLEAR, p=Change port, q=EXIT",
+            long_instruction="b=Process BUY, s=Process SELL, f=COMMIT, c=CLEAR, p=Change PORT, o=Previous, q=EXIT",
             default=Action.CHANGE_TRADE_PORT if deps.run_manager.trade_port is None
             else Action.PROCESS_BUY if not deps.run_manager.is_dirty()
             else Action.PROCESS_SELL,
@@ -973,6 +1006,9 @@ def run_choices():
         @action_prompt.register_kb("p")
         def _handle_change_port(event): event.app.exit(result=Action.CHANGE_TRADE_PORT)
 
+        @action_prompt.register_kb("o", filter=deps.run_manager.trade_port is not None)
+        def _handle_manage_previous(event): event.app.exit(result=Action.MANAGE_PREVIOUS)
+
         @action_prompt.register_kb("q")
         def _handle_exit(event): event.app.exit(result=None)
 
@@ -980,6 +1016,9 @@ def run_choices():
         match action:
             case Action.CHANGE_TRADE_PORT:
                 deps.run_manager.change_trade_port(deps.static_data, default=False)
+
+            case Action.MANAGE_PREVIOUS:
+                manage_previous(deps)
 
             case Action.PROCESS_BUY | Action.PROCESS_SELL:
                 run(action, deps)

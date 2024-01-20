@@ -5,8 +5,9 @@ class Action(Enum):
     CHANGE_TRADE_PORT = 0
     PROCESS_BUY = 1
     PROCESS_SELL = 2
-    COMMIT = 3
-    CLEAR = 4
+    MANAGE_PREVIOUS = 3
+    COMMIT = 4
+    CLEAR = 5
 
 
 class BoundaryPosition(Enum):
