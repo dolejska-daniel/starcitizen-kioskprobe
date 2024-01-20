@@ -850,24 +850,8 @@ def commit(deps: DependencyContainer):
         return
 
     run_manager.change_trade_port(static_data)
-
     trade_port_code = run_manager.trade_port["code"]
     trade_port_system = run_manager.trade_port["system_code"]
-    run_data = {
-        "tradeport": trade_port_code,
-        "system": trade_port_system,
-        "id_user_helper": "",
-        "screenshot": "",
-        "return_to_page": 0,
-        "details": "",
-        "new_buy[]": "",
-        "new_sell[]": "",
-        "new_commodity[]": "",
-        **{f"sell[{item.code}]": item.price for item in run_manager.sell},
-        **{f"scu_sell[{item.code}]": item.stock for item in run_manager.sell},
-        **{f"buy[{item.code}]": item.price for item in run_manager.buy},
-        **{f"scu_buy[{item.code}]": item.stock for item in run_manager.buy},
-    }
 
     def confirm_submission() -> bool:
         print()
@@ -924,6 +908,22 @@ def commit(deps: DependencyContainer):
             print("There are no data run changes to commit anymore.")
             log.info("no changes to commit anymore")
             return
+
+    run_data = {
+        "tradeport": trade_port_code,
+        "system": trade_port_system,
+        "id_user_helper": "",
+        "screenshot": "",
+        "return_to_page": 0,
+        "details": "",
+        "new_buy[]": "",
+        "new_sell[]": "",
+        "new_commodity[]": "",
+        **{f"sell[{item.code}]": item.price for item in run_manager.sell},
+        **{f"scu_sell[{item.code}]": item.stock for item in run_manager.sell},
+        **{f"buy[{item.code}]": item.price for item in run_manager.buy},
+        **{f"scu_buy[{item.code}]": item.stock for item in run_manager.buy},
+    }
 
     try:
         headers = {
