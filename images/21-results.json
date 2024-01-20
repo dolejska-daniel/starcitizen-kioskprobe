@@ -1,0 +1,19 @@
+{
+    "item_count": 2,
+    "valid_item_count": 1,
+    "detected_name_count": 1,
+    "detected_price_count": 2,
+    "detected_stock_count": 2,
+    "data_names": [
+        "Scrap",
+        null
+    ],
+    "data_prices": [
+        136.0,
+        3.0
+    ],
+    "data_stocks": [
+        3000.0,
+        75.0
+    ]
+}

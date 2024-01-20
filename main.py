@@ -1075,7 +1075,7 @@ def run_benchmark(images_dir: Path = None):
             attribute_previous = previous_results[attribute_key]
 
             pct = attribute_current / max_value * 100 if max_value else 0
-            pct_value = f"{pct:5.1f}%  " if pct > 0 else ""
+            pct_value = f"{pct:5.1f}%  " if pct > 0 else " " * 8
             pct_diff = (attribute_current - attribute_previous) / attribute_previous * 100 if attribute_previous else float("inf")
 
             row.append(f"{pct_value}{pct_diff:+6.1f}%")
@@ -1093,12 +1093,12 @@ def run_benchmark(images_dir: Path = None):
             pairs_equal = map(lambda pair: pair[0] == pair[1], value_pairs)
 
             pct = sum(pairs_equal) / len(value_pairs) * 100 if len(value_pairs) else 0
-            pct_value = f"{pct:5.1f}%  " if pct > 0 else ""
-            pct_diff = pct - 100.0
+            pct_value = f"{pct:5.1f}%  " if pct > 0 else " " * 8
+            pct_diff = pct - 100.0 if pct else float("inf")
 
             row.append(f"{pct_value}{pct_diff:+6.1f}%")
 
-        row_style = "bright green" if success_measure > 0.0 else "dim" if success_measure == 0.0 else "red"
+        row_style = "bright_green" if success_measure > 0.0 else "dim" if success_measure == 0.0 else "red"
         table.add_row(*row, style=row_style)
 
     console = Console()
