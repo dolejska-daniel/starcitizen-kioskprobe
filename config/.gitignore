@@ -1,1 +1,2 @@
-session.json
+*.json
+!*.sample.json
