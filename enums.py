@@ -2,12 +2,11 @@ from enum import Enum
 
 
 class Action(Enum):
-    CHANGE_TRADE_PORT = 0
+    CHANGE_TERMINAL = 0
     PROCESS_BUY = 1
     PROCESS_SELL = 2
-    MANAGE_PREVIOUS = 3
-    COMMIT = 4
-    CLEAR = 5
+    COMMIT = 3
+    CLEAR = 4
 
 
 class BoundaryPosition(Enum):
@@ -29,19 +28,22 @@ class NodeType(Enum):
     COMMODITY_NAME = 1
     COMMODITY_PRICE = 2
     COMMODITY_STOCK = 3
+    COMMODITY_INVENTORY = 4
 
 
 class EditAction(Enum):
     FINALIZE = -1
-    DISCARD_ALL = -2
+    ADD_NEW = -2
+    DISCARD_ALL = -3
 
 
 class CommitRejectAction(Enum):
     ABORT = 0
     CONTINUE = 1
-    EDIT = 2
-    DISCARD = 3
-    CLEAR = 4
+    ADD_NEW = 2
+    EDIT = 3
+    DISCARD = 4
+    CLEAR = 5
 
 
 class EditTarget(Enum):
@@ -49,6 +51,6 @@ class EditTarget(Enum):
     DISCARD = -2
     ALL = -1
     NAME = 0
-    CODE = 1
-    PRICE = 2
-    STOCK = 3
+    PRICE = 1
+    STOCK = 2
+    INVENTORY = 3
