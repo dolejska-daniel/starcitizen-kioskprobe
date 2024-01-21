@@ -235,17 +235,17 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
     return items, image
 
 
-def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer) -> Sequence[DetectedCommodity]:
+def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer, item_type: ItemType = ItemType.UNDEFINED) -> Sequence[DetectedCommodity]:
     while True:
-        items = list(sorted(items, key=lambda item: item.name or "zzz"))
+        items = list(sorted(items, key=lambda item: item.position_y))
         choices_invalid = [Choice(_id, name=str(item)) for _id, item in enumerate(items) if not item.is_valid()]
         choices_valid = [Choice(_id, name=str(item)) for _id, item in enumerate(items) if item.is_valid()]
         item_index: int | None = inquirer.select(
             message="Select an item to edit:",
             choices=[
                 # invalid items
-                Choice(EditAction.ADD_NEW, name="Add new item"),
-                *([Choice(EditAction.FINALIZE, name="Discard invalid items")] if len(choices_invalid) else []),
+                Choice(EditAction.ADD_NEW, name="ADD new item"),
+                *([Choice(EditAction.FINALIZE, name="DISCARD invalid items")] if len(choices_invalid) else []),
                 Separator(),
                 *choices_invalid,
                 # valid items
@@ -253,8 +253,8 @@ def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer) ->
                 *choices_valid,
                 # other options
                 Separator(),
-                *([Choice(EditAction.FINALIZE, name="Finish editing")] if len(choices_invalid) == 0 else []),
-                *([Choice(EditAction.DISCARD_ALL, name="Discard all")] if len(items) else []),
+                *([Choice(EditAction.FINALIZE, name="FINISH editing")] if len(choices_invalid) == 0 else []),
+                *([Choice(EditAction.DISCARD_ALL, name="DISCARD ALL")] if len(items) else []),
             ],
             default=EditAction.FINALIZE,
         ).execute()
@@ -262,7 +262,8 @@ def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer) ->
         try:
             match item_index:
                 case EditAction.ADD_NEW:
-                    add_item(deps.run_manager, deps.uexcorp)
+                    new_item = add_item(deps.run_manager, deps.uexcorp, item_type=item_type)
+                    items.append(new_item)
                     continue
 
                 case EditAction.FINALIZE:
@@ -282,10 +283,10 @@ def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer) ->
             fix_targets: list[EditTarget] = inquirer.select(
                 message="Select attributes to change:",
                 choices=[
-                    Choice(EditTarget.NAME, name="Change commodity", enabled=not item.name),
-                    Choice(EditTarget.PRICE, name="Change price", enabled=not item.price or item.price > 10_000_000),
-                    Choice(EditTarget.STOCK, name="Change stock", enabled=not item.stock or item.stock > 100_000),
-                    Choice(EditTarget.INVENTORY, name="Change inventory", enabled=not item.inventory),
+                    Choice(EditTarget.NAME, name="Change COMMODITY", enabled=not item.name),
+                    Choice(EditTarget.PRICE, name="Change PRICE", enabled=not item.price or item.price > 10_000_000),
+                    Choice(EditTarget.STOCK, name="Change STOCK", enabled=not item.stock or item.stock > 100_000),
+                    Choice(EditTarget.INVENTORY, name="Change INVENTORY", enabled=not item.inventory),
                 ],
                 multiselect=True,
             ).execute()
@@ -363,7 +364,7 @@ def edit_item_stock(item):
         message="Enter stock:",
         validate=FloatValidator(min_value=0.0),
         filter=lambda result: float(result),
-        default=str(item.stock) if item.stock > 0 else "0",
+        default="",
         transformer=lambda result: "%s SCU" % result,
     ).execute()
 
@@ -373,7 +374,7 @@ def edit_item_price(item):
         message="Enter price:",
         validate=FloatValidator(min_value=0.0),
         filter=lambda result: float(result),
-        default=str(item.price) if item.price > 0 else "0",
+        default="",
         transformer=lambda result: "%s aUEC" % result,
     ).execute()
 
@@ -392,7 +393,7 @@ def edit_item_name(item: DetectedCommodity, uexcorp: UEXCorp):
 def edit_item_inventory(item: DetectedCommodity, static_data: StaticData):
     inventory_status_index: int = inquirer.fuzzy(
         message="Select inventory status:",
-        choices=[Choice(_id, name=s.name) for _id, s in enumerate(static_data.inventory_states)],
+        choices=[Choice(_id, name=s.name) for _id, s in enumerate(static_data.inventory_states) if s.visible],
         default=item.inventory.name if item.inventory is not None else None,
     ).execute()
     item.inventory = static_data.inventory_states[inventory_status_index]
@@ -451,7 +452,7 @@ def run(action: Action, deps: DependencyContainer):
         return
 
 
-def add_item(run_manager: DataRunManager, uexcorp: UEXCorp, item_type: ItemType = ItemType.UNDEFINED):
+def add_item(run_manager: DataRunManager, uexcorp: UEXCorp, item_type: ItemType = ItemType.UNDEFINED) -> DetectedCommodity:
     if item_type == ItemType.UNDEFINED:
         item_type = inquirer.select(
             message="Select item category:",
@@ -481,6 +482,8 @@ def add_item(run_manager: DataRunManager, uexcorp: UEXCorp, item_type: ItemType 
             run_manager.add_buy(item)
         case ItemType.SELL:
             run_manager.add_sell(item)
+
+    return item
 
 
 def commit(deps: DependencyContainer):
@@ -568,12 +571,12 @@ def commit_new(run_manager: DataRunManager):
             *[sell_entry_from_commodity(item) for item in run_manager.sell],
         ]
     )
-    deps.uexcorp.api.submit_data_run(data_run)
+    response = deps.uexcorp.api.submit_data_run(data_run)
 
     log.info("successfully submitted data run (dry run: %s)", deps.settings.dry_run)
-    #run_manager.clear()
+    run_manager.clear()
     print("Data successfully submitted:")
-    print(f" - https://ptu.uexcorp.space/data/history/type/commodity/id_terminal/{run_manager.terminal.id}/")
+    print(f" - https://ptu.uexcorp.space/data/history/type/commodity/id_terminal/{run_manager.terminal.id}/datarunner/{response.data.username}")
     print()
 
 

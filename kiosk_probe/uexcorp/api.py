@@ -62,11 +62,13 @@ class UEXCorpApi:
         data = self.get(f"/commodities_prices/id_terminal/{id_terminal}")
         return [CommodityPrice(**commodity_price) for commodity_price in data["data"]]
 
-    def submit_data_run(self, data_run: DataRun) -> None:
-        data = dataclasses.asdict(data_run)
-        response = self.session.post(f"{self.config.base_url}/data_submit", json=data)
-        log.debug("submission response response: %s", response.json())
+    def submit_data_run(self, data_run: DataRun) -> DataRunResponse:
+        request_data = dataclasses.asdict(data_run)
+        response = self.session.post(f"{self.config.base_url}/data_submit", json=request_data)
+        response_data = response.json()
+        log.debug("submission response response: %s", response_data)
         response.raise_for_status()
+        return DataRunResponse(**response_data)
 
 
 class UEXCorp:

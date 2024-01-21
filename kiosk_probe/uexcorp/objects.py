@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, KW_ONLY
 from typing import TypedDict, Any
 
 
@@ -19,6 +19,7 @@ class UEXCorpApiConfig:
 class InventoryStatus:
     value: int | None
     name: str
+    visible: bool = field(default=True)
 
     def __str__(self):
         return self.name
@@ -230,3 +231,17 @@ class DataRun:
     is_production: bool = field(default=False)
     type: str = field(default="commodity")
 
+
+@dataclass
+class DataRunResponseData:
+    ids_reports: list[str]
+    date_added: int
+    username: str
+
+
+@dataclass
+class DataRunResponse:
+    status: str
+    http_code: int
+    data: DataRunResponseData
+    time: int

@@ -40,7 +40,7 @@ class StaticData:
             InventoryStatus(5, "     HIGH INVENTORY"),
             InventoryStatus(6, "VERY HIGH INVENTORY"),
             InventoryStatus(7, "      MAX INVENTORY"),
-            InventoryStatus(7, "          NO DEMAND"),
+            InventoryStatus(7, "          NO DEMAND", visible=False),
         ]
 
     def load_commodities(self, base_path: Path):
