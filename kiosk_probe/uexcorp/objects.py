@@ -245,3 +245,7 @@ class DataRunResponse:
     http_code: int
     data: DataRunResponseData
     time: int
+
+    # noinspection PyArgumentList
+    def __post_init__(self):
+        self.data = DataRunResponseData(**self.data)

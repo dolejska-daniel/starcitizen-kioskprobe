@@ -159,12 +159,26 @@ class DataRunManager:
                     match item_type:
                         case ItemType.BUY:
                             price_change_text, price_change = self.percentage_diff(item.price, prices.price_buy)
+                            if not prices.price_buy_min_month <= item.price <= prices.price_buy_max_month:
+                                price_change_text = f"[bright_red bold blink]{price_change_text}[/bright_red bold blink]"
+                                change_is_large = True
+
                             stock_change_text, stock_change = self.percentage_diff(item.stock, prices.scu_buy)
-                            change_is_large = not prices.price_buy_min_month <= item.price <= prices.price_buy_max_month
+                            if not prices.scu_buy_min_month <= item.stock <= prices.scu_buy_max_month:
+                                stock_change_text = f"[bright_red bold blink]{stock_change_text}[/bright_red bold blink]"
+                                change_is_large = True
+
                         case ItemType.SELL:
                             price_change_text, price_change = self.percentage_diff(item.price, prices.price_sell)
+                            if not prices.price_sell_min_month <= item.price <= prices.price_sell_max_month:
+                                price_change_text = f"[bright_red bold blink]{price_change_text}[/bright_red bold blink]"
+                                change_is_large = True
+
                             stock_change_text, stock_change = self.percentage_diff(item.stock, prices.scu_sell)
-                            change_is_large = not prices.price_sell_min_month <= item.price <= prices.price_sell_max_month
+                            if not prices.scu_sell_min_month <= item.stock <= prices.scu_sell_max_month:
+                                stock_change_text = f"[bright_red bold blink]{stock_change_text}[/bright_red bold blink]"
+                                change_is_large = True
+
                         case _:
                             price_change_text = "N/A"
                             stock_change_text = "N/A"
@@ -177,7 +191,7 @@ class DataRunManager:
                     item.inventory.name,
                     price_change_text,
                     stock_change_text,
-                    style="yellow" if change_is_new else "bright_red" if change_is_large else "bright_green",
+                    style="yellow" if change_is_new else "bright_green" if not change_is_large else "",
                 )
 
             console.print(table_valid)

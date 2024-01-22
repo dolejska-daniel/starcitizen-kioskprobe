@@ -12,8 +12,9 @@ class Settings:
         log.debug("loading settings")
         self.base_path = Path(__file__).parent / "config"
         self.show_images = False
-        self.crop_resulting_image = True
+        self.show_report_links = True
         self.show_all_text_nodes = False
+        self.crop_resulting_image = True
         self.dry_run = False
         self.uexcorp_api_config = self.load_uexcorp()
 

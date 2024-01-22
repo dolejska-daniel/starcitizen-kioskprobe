@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging.config
+from dataclasses import asdict
 from pathlib import Path
 from typing import Sequence, TypedDict
 
@@ -93,7 +94,7 @@ def convert_node_type(node: TextNode, static_data: StaticData):
         log.debug("parsed commodity price: %f", price)
         return
 
-    inventory_match, distance = find_best_string_match(node.text, static_data.inventory_states, key=lambda i: i.name.upper())
+    inventory_match, distance = find_best_string_match(node.text, static_data.inventory_states, key=lambda i: i.name.strip().upper())
     distance_max = len(inventory_match.name) * 0.33
     if distance <= distance_max:
         node.type = NodeType.COMMODITY_INVENTORY
@@ -146,7 +147,7 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
         canvas_size=max(image.shape[:2]),
         # bounding box merging
         slope_ths=0.25,
-        ycenter_ths=0.20,
+        ycenter_ths=0.30,
         height_ths=0.9,
         width_ths=1.5,
     )
@@ -556,10 +557,6 @@ def commit(deps: DependencyContainer):
             log.info("no changes to commit anymore")
             return
 
-    if deps.settings.dry_run:
-        print("Dry run, skipping submission.")
-        return
-
     commit_new(run_manager)
 
 
@@ -569,15 +566,45 @@ def commit_new(run_manager: DataRunManager):
         prices=[
             *[buy_entry_from_commodity(item) for item in run_manager.buy],
             *[sell_entry_from_commodity(item) for item in run_manager.sell],
-        ]
+        ],
+        is_production=False if deps.settings.dry_run else True,
     )
+
+    log.debug("submitting data run: %s", asdict(data_run))
     response = deps.uexcorp.api.submit_data_run(data_run)
 
     log.info("successfully submitted data run (dry run: %s)", deps.settings.dry_run)
-    run_manager.clear()
+    if deps.settings.dry_run:
+        print("Real submission skipped.")
+        return
+
+    if deps.settings.show_report_links:
+        table = Table(title="Data Run Reports")
+        table.add_column("Commodity")
+        table.add_column("Report Link")
+
+        buy_commodities = {item.commodity.id: item.commodity for item in run_manager.buy}
+        for report_id, commodity in zip(response.data.ids_reports[:len(buy_commodities)], buy_commodities.values()):
+            table.add_row(
+                commodity.name,
+                f"https://ptu.uexcorp.space/data/info/id/{report_id}",
+            )
+
+        sell_commodities = {item.commodity.id: item.commodity for item in run_manager.sell}
+        for report_id, commodity in zip(response.data.ids_reports[len(buy_commodities):], sell_commodities.values()):
+            table.add_row(
+                commodity.name,
+                f"https://ptu.uexcorp.space/data/info/id/{report_id}",
+            )
+
+        print()
+        Console().print(table)
+        print()
+
     print("Data successfully submitted:")
-    print(f" - https://ptu.uexcorp.space/data/history/type/commodity/id_terminal/{run_manager.terminal.id}/datarunner/{response.data.username}")
+    print(f" - https://ptu.uexcorp.space/data/home/type/commodity/id_terminal/{run_manager.terminal.id}/datarunner/{response.data.username}")
     print()
+    run_manager.clear()
 
 
 def commit_old(run_manager, session_cookies, trade_port_code, trade_port_system):
@@ -597,6 +624,11 @@ def commit_old(run_manager, session_cookies, trade_port_code, trade_port_system)
         **{f"scu_buy[{item.commodity}]": item.stock for item in run_manager.buy},
     }
 
+    log.debug("submitting data run: %s", run_data)
+    if deps.settings.dry_run:
+        print("Real submission skipped.")
+        return
+
     try:
         headers = {
             "Accept": "*/*",
@@ -605,16 +637,15 @@ def commit_old(run_manager, session_cookies, trade_port_code, trade_port_system)
             "Origin": "https://portal.uexcorp.space",
             "Referer": f"https://portal.uexcorp.space/dataruns/submit/system/{trade_port_system}/tradeport/{trade_port_code}/",
         }
-        if not deps.settings.dry_run:
-            response = requests.post(
-                "https://portal.uexcorp.space/dataruns/submit",
-                data=run_data,
-                cookies=session_cookies,
-                allow_redirects=False,
-                headers=headers,
-            )
-            log.debug("submission response: %s", response.text)
-            response.raise_for_status()
+        response = requests.post(
+            "https://portal.uexcorp.space/dataruns/submit",
+            data=run_data,
+            cookies=session_cookies,
+            allow_redirects=False,
+            headers=headers,
+        )
+        log.debug("submission response: %s", response.text)
+        response.raise_for_status()
 
         log.info("successfully submitted data run (dry run: %s)", deps.settings.dry_run)
         run_manager.clear()
