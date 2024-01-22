@@ -4,7 +4,9 @@
     "detected_name_count": 0,
     "detected_price_count": 0,
     "detected_stock_count": 0,
+    "detected_inventory_count": 0,
     "data_names": [],
     "data_prices": [],
-    "data_stocks": []
+    "data_stocks": [],
+    "data_inventories": []
 }

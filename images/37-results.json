@@ -1,0 +1,28 @@
+{
+    "item_count": 3,
+    "valid_item_count": 0,
+    "detected_name_count": 3,
+    "detected_price_count": 3,
+    "detected_stock_count": 3,
+    "detected_inventory_count": 3,
+    "data_names": [
+        "Copper (Ore)",
+        "Iron (Ore)",
+        "Scrap"
+    ],
+    "data_prices": [
+        NaN,
+        NaN,
+        NaN
+    ],
+    "data_stocks": [
+        245.0,
+        247.0,
+        458.0
+    ],
+    "data_inventories": [
+        "      LOW INVENTORY",
+        "      LOW INVENTORY",
+        "       OUT OF STOCK"
+    ]
+}

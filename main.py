@@ -5,12 +5,6 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Sequence, TypedDict
 
-from InquirerPy.validator import NumberValidator
-from prompt_toolkit.validation import ValidationError
-
-from datarun import DetectedCommodity, DataRunManager, ItemType
-from enums import *
-
 import cv2
 import easyocr
 import matplotlib.pyplot as plt
@@ -19,17 +13,19 @@ import requests
 from InquirerPy import inquirer
 from InquirerPy.base.control import Choice
 from InquirerPy.separator import Separator
+from InquirerPy.validator import NumberValidator
 from PIL import ImageGrab
+from prompt_toolkit.validation import ValidationError
 from rich.console import Console
 from rich.table import Table
 
+from datarun import DetectedCommodity, DataRunManager, ItemType
+from enums import *
 from kiosk_probe.uexcorp.api import UEXCorp
-from kiosk_probe.uexcorp.objects import DataRun, DataRunCommodityBuyEntry, DataRunCommoditySellEntry, Commodity, \
-    InventoryStatus
+from kiosk_probe.uexcorp.objects import DataRun, DataRunCommodityBuyEntry, DataRunCommoditySellEntry, Commodity
 from settings import Settings
 from static_data import StaticData
-from utils import filter_by_type, levenshtein, convert_similar_letters_to_numbers, \
-    find_best_string_match, TextNode
+from utils import filter_by_type, levenshtein, find_best_string_match, TextNode
 
 print("Preparing...")
 
@@ -65,6 +61,7 @@ def convert_node_type(node: TextNode, static_data: StaticData):
     if levenshtein(node.text[-3:], "SCU") <= 1:
         log.debug("trying to parse commodity stock from '%s'", node.text)
         value = node.text.strip().strip(ascii_letters)
+        value = value.strip("/")
         value = value.replace("O", "0")
         value = value.replace(",", "")
         value = value.replace(" ", "")
@@ -85,6 +82,7 @@ def convert_node_type(node: TextNode, static_data: StaticData):
         price = price.replace(" ", "")
         price = price.replace("O", "0")
         price = price.replace(",", ".")
+        price = price.strip("/")
         price = price.lstrip(ascii_letters)
         price = price[1:]  # remove leading character (misrepresentation of currency symbol)
         price = float(price[:-1]) * 1000 if price.upper().endswith("K") else float(price)
@@ -95,7 +93,7 @@ def convert_node_type(node: TextNode, static_data: StaticData):
         return
 
     inventory_match, distance = find_best_string_match(node.text, static_data.inventory_states, key=lambda i: i.name.strip().upper())
-    distance_max = len(inventory_match.name) * 0.33
+    distance_max = len(inventory_match.name.strip()) * 0.33
     if distance <= distance_max:
         node.type = NodeType.COMMODITY_INVENTORY
         node.value = inventory_match.name
@@ -124,13 +122,13 @@ def convert_node_type(node: TextNode, static_data: StaticData):
     )
 
 
-def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: StaticData) \
+def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: StaticData, image_name: str = "image") \
         -> tuple[list[DetectedCommodity], np.ndarray]:
     if image is None or len(image.shape) != 3:
         log.error("failed to read image for processing, shape %s", image.shape if image is not None else None)
         return [], np.array([])
 
-    print("Processing image...")
+    print(f"Processing {image_name}...")
     log.info("processing image, shape %s", image.shape)
     texts = reader.readtext(
         image,
@@ -149,7 +147,7 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
         slope_ths=0.25,
         ycenter_ths=0.30,
         height_ths=0.9,
-        width_ths=1.5,
+        width_ths=1.2,
     )
 
     inventory_cutoff_coords = np.array([0, 0])
@@ -417,7 +415,7 @@ def run(action: Action, deps: DependencyContainer):
         return
 
     try:
-        items, _ = process_image(image, reader, static_data)
+        items, _ = process_image(image, reader, static_data, image_name="clipboard screenshot")
         log.debug(f"detected items: {items}")
 
     except Exception as e:
@@ -738,12 +736,14 @@ class BenchmarkResults(TypedDict):
     detected_name_count: int
     detected_price_count: int
     detected_stock_count: int
+    detected_inventory_count: int
     data_names: list[str | None]
-    data_prices: list[float | None]
-    data_stocks: list[float | None]
+    data_prices: list[float]
+    data_stocks: list[float]
+    data_inventories: list[str | None]
 
 
-def run_benchmark(images_dir: Path = None):
+def run_benchmark(images_dir: Path = None, override_results: bool = False):
     images_dir = images_dir or Path(__file__).parent / "images"
     log.info("running benchmark on images in %s", images_dir.absolute())
 
@@ -752,7 +752,7 @@ def run_benchmark(images_dir: Path = None):
 
     for image_path in images_dir.glob("*.jpg"):
         image = cv2.imread(image_path.absolute().as_posix())
-        items, image = process_image(image, deps.image_reader, deps.static_data)
+        items, image = process_image(image, deps.image_reader, deps.static_data, image_name=image_path.name)
         items = list(sorted(items, key=lambda item: item.name or "zzz"))
 
         previous_results: BenchmarkResults | None = None
@@ -765,19 +765,42 @@ def run_benchmark(images_dir: Path = None):
             "item_count": len(items),
             "valid_item_count": len(list(filter(lambda i: i.is_valid(), items))),
             "detected_name_count": len(list(filter(lambda i: i.name is not None, items))),
-            "detected_price_count": len(list(filter(lambda i: i.price is not None, items))),
-            "detected_stock_count": len(list(filter(lambda i: i.stock is not None, items))),
+            "detected_price_count": len(list(filter(lambda i: i.price != float("nan"), items))),
+            "detected_stock_count": len(list(filter(lambda i: i.stock != float("nan"), items))),
+            "detected_inventory_count": len(list(filter(lambda i: i.inventory is not None, items))),
             "data_names": [i.name for i in items],
-            "data_prices": [i.price for i in items],
-            "data_stocks": [i.stock for i in items],
+            "data_prices": [i.price if i.price != float("nan") else "nan" for i in items],
+            "data_stocks": [i.stock if i.stock != float("nan") else "nan" for i in items],
+            "data_inventories": [i.inventory.name if i.inventory is not None else None for i in items],
         }
 
         processed_image_path = image_path.with_name(f"{image_path.stem}-processed.png")
-        if not processed_image_path.exists():
+        if not processed_image_path.exists() or override_results:
             log.debug("saving processed image to %s", processed_image_path.absolute())
             cv2.imwrite(processed_image_path.absolute().as_posix(), image)
 
-        if previous_results is None:
+        fig, axes = plt.subplots(1, 2, figsize=(12, 10))
+        image_previous = cv2.imread(processed_image_path.absolute().as_posix())
+        image_previous = cv2.cvtColor(image_previous, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        axes[0].imshow(image_previous)
+        axes[0].set_title("Previous")
+        axes[0].get_xaxis().set_visible(False)
+        axes[0].get_yaxis().set_visible(False)
+
+        axes[1].imshow(image)
+        axes[1].set_title("Current")
+        axes[1].get_xaxis().set_visible(False)
+        axes[1].get_yaxis().set_visible(False)
+
+        fig.tight_layout()
+        plt.savefig(image_path.with_name(f"{image_path.stem}-comparison.png").absolute().as_posix())
+        plt.close(fig)
+
+        with results_filepath.with_name(f"{image_path.stem}-results-current.json").open("w") as file:
+            json.dump(results, file, indent=4)
+
+        if previous_results is None or override_results:
             previous_results = results
             log.debug("saving new results to %s", results_filepath.absolute())
             with results_filepath.open("w") as file:
@@ -789,7 +812,7 @@ def run_benchmark(images_dir: Path = None):
     # print result percentages in a table using fixed width columns
     print()
     table = Table(title="Results")
-    columns = ["image_name", "items", "valid_items", "names", "prices", "stocks", "matching_names", "matching_prices", "matching_stocks"]
+    columns = ["image_name", "items", "valid_items", "names", "prices", "stocks", "inventories", "matching_names", "matching_prices", "matching_stocks", "matching_inventories"]
     success_measure_key = "valid_item_count"
     for column in columns:
         table.add_column(column)
@@ -801,6 +824,7 @@ def run_benchmark(images_dir: Path = None):
             "detected_name_count": previous_results["item_count"],
             "detected_price_count": previous_results["item_count"],
             "detected_stock_count": previous_results["item_count"],
+            "detected_inventory_count": previous_results["item_count"],
         }
         row = [key]
         success_measure = 1.0
@@ -848,6 +872,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", action="store", help="run for a single image", type=Path)
     parser.add_argument("--benchmark", action="store_true", help="run benchmark")
+    parser.add_argument("--benchmark-override", action="store_true", help="store benchmark results as new baseline")
     # parser.add_argument("--benchmark-glob", action="store_true", help="run benchmark")
     parser.add_argument("--show-images", action="store_true", help="show processed images")
     parser.add_argument("--show-all-nodes", action="store_true", help="show all text nodes")
@@ -858,17 +883,17 @@ if __name__ == '__main__':
     deps.settings.show_images = args.show_images
     deps.settings.dry_run = args.dry_run
     deps.settings.crop_resulting_image = args.no_crop is False
-    deps.settings.show_all_text_nodes = args.show_all_nodes
+    deps.settings.show_all_text_nodes = args.show_all_nodes or args.benchmark
 
     try:
         if args.image:
             image = cv2.imread(args.image.absolute().as_posix())
-            result, image = process_image(image, deps.image_reader, deps.static_data)
+            result, image = process_image(image, deps.image_reader, deps.static_data, image_name=args.image.name)
             print(result)
             exit(0)
 
         if args.benchmark:
-            run_benchmark()
+            run_benchmark(override_results=args.benchmark_override)
             exit(0)
 
         run_choices()

@@ -1,0 +1,24 @@
+{
+    "item_count": 2,
+    "valid_item_count": 2,
+    "detected_name_count": 2,
+    "detected_price_count": 2,
+    "detected_stock_count": 2,
+    "detected_inventory_count": 2,
+    "data_names": [
+        "Scrap",
+        "Waste"
+    ],
+    "data_prices": [
+        4136.0,
+        3.0
+    ],
+    "data_stocks": [
+        23040.0,
+        75.0
+    ],
+    "data_inventories": [
+        "      MAX INVENTORY",
+        "      MAX INVENTORY"
+    ]
+}

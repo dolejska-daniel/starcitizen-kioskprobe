@@ -4,6 +4,7 @@
     "detected_name_count": 7,
     "detected_price_count": 7,
     "detected_stock_count": 7,
+    "detected_inventory_count": 7,
     "data_names": [
         "Beryl",
         "Copper",
@@ -30,5 +31,14 @@
         4820.0,
         8.0,
         75.0
+    ],
+    "data_inventories": [
+        " VERY LOW INVENTORY",
+        "      MAX INVENTORY",
+        "      MAX INVENTORY",
+        " VERY LOW INVENTORY",
+        "VERY HIGH INVENTORY",
+        " VERY LOW INVENTORY",
+        "      MAX INVENTORY"
     ]
 }

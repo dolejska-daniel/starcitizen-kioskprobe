@@ -213,7 +213,7 @@ class TextNode:
             nodes = filter_by_type(nodes, node_type)
 
         nodes = filter_by_direction(nodes, self, Direction.DOWN)
-        nodes = self.sort_by_distance(nodes, max_distance=self.radius * 2.5, ratio_x=1.5)
+        nodes = self.sort_by_distance(nodes, max_distance=self.radius * 2.5)
         if len(nodes):
             closest_node = nodes[0]
             self.bottom = closest_node

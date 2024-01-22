@@ -4,6 +4,7 @@
     "detected_name_count": 2,
     "detected_price_count": 2,
     "detected_stock_count": 2,
+    "detected_inventory_count": 2,
     "data_names": [
         "Scrap",
         "Waste"
@@ -15,5 +16,9 @@
     "data_stocks": [
         3000.0,
         75.0
+    ],
+    "data_inventories": [
+        "      MAX INVENTORY",
+        "      MAX INVENTORY"
     ]
 }

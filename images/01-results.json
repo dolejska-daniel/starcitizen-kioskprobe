@@ -1,37 +1,52 @@
 {
-    "item_count": 8,
-    "valid_item_count": 5,
-    "detected_name_count": 5,
-    "detected_price_count": 8,
-    "detected_stock_count": 8,
+    "item_count": 9,
+    "valid_item_count": 6,
+    "detected_name_count": 8,
+    "detected_price_count": 9,
+    "detected_stock_count": 9,
+    "detected_inventory_count": 8,
     "data_names": [
+        "Astatine",
         "Beryl",
         "Bexalite",
         "Chlorine",
         "Copper",
         "Corundum",
-        null,
-        null,
+        "Diamond",
+        "Diamond",
         null
     ],
     "data_prices": [
+        900.0,
         2815.99998,
         7462.99982,
         170.0,
         372.0,
         388.0,
-        900.0,
+        NaN,
         555.0,
-        4302.00004
+        555.0
     ],
     "data_stocks": [
+        0.0,
         149.0,
         0.0,
         0.0,
         27.0,
         0.0,
         0.0,
-        0.0,
+        54302000048.0,
         0.0
+    ],
+    "data_inventories": [
+        "       OUT OF STOCK",
+        "       OUT OF STOCK",
+        "       OUT OF STOCK",
+        "       OUT OF STOCK",
+        "       OUT OF STOCK",
+        "       OUT OF STOCK",
+        "       OUT OF STOCK",
+        null,
+        "       OUT OF STOCK"
     ]
 }
