@@ -15,10 +15,10 @@
         "Stims"
     ],
     "data_prices": [
-        3463.99998,
+        9463.99998,
         2292.99998,
         243.0,
-        32.0,
+        232.0,
         2180.00006,
         1485.00001,
         379.0
@@ -33,12 +33,12 @@
         0.0
     ],
     "data_inventories": [
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK"
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK"
     ]
 }

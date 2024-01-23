@@ -229,6 +229,7 @@ class DataRun:
     details: str | None = field(default=None)
     game_version: str | None = field(default=None)
     is_production: bool = field(default=False)
+    screenshot: str | None = field(default=None, repr=False)
     type: str = field(default="commodity")
 
 

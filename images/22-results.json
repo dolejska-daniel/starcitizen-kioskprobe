@@ -11,14 +11,14 @@
     ],
     "data_prices": [
         136.0,
-        3.0
+        43.0
     ],
     "data_stocks": [
         3000.0,
         75.0
     ],
     "data_inventories": [
-        "      MAX INVENTORY",
-        "      MAX INVENTORY"
+        "MAX INVENTORY",
+        "MAX INVENTORY"
     ]
 }

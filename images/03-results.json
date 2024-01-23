@@ -17,7 +17,7 @@
     ],
     "data_prices": [
         900.0,
-        815.9999799999999,
+        2815.99998,
         7462.99982,
         170.0,
         372.0,
@@ -36,13 +36,13 @@
         0.0
     ],
     "data_inventories": [
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK"
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK"
     ]
 }

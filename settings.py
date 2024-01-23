@@ -15,6 +15,7 @@ class Settings:
         self.show_report_links = True
         self.show_all_text_nodes = False
         self.crop_resulting_image = True
+        self.include_screenshots = True
         self.dry_run = False
         self.uexcorp_api_config = self.load_uexcorp()
 

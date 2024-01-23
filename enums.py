@@ -54,3 +54,9 @@ class EditTarget(Enum):
     PRICE = 1
     STOCK = 2
     INVENTORY = 3
+
+
+class ItemType(Enum):
+    BUY = "buy"
+    SELL = "sell"
+    UNDEFINED = "undefined"

@@ -10,7 +10,7 @@
         "Waste"
     ],
     "data_prices": [
-        4136.0,
+        136.0,
         3.0
     ],
     "data_stocks": [
@@ -18,7 +18,7 @@
         75.0
     ],
     "data_inventories": [
-        "      MAX INVENTORY",
-        "      MAX INVENTORY"
+        "MAX INVENTORY",
+        "MAX INVENTORY"
     ]
 }

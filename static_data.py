@@ -33,14 +33,14 @@ class StaticData:
         self.load_commodities(base_path)
         self.load_stations(base_path)
         self.inventory_states = [
-            InventoryStatus(1, "       OUT OF STOCK"),
-            InventoryStatus(2, " VERY LOW INVENTORY"),
-            InventoryStatus(3, "      LOW INVENTORY"),
-            InventoryStatus(4, "   MEDIUM INVENTORY"),
-            InventoryStatus(5, "     HIGH INVENTORY"),
+            InventoryStatus(1, "OUT OF STOCK"),
+            InventoryStatus(2, "VERY LOW INVENTORY"),
+            InventoryStatus(3, "LOW INVENTORY"),
+            InventoryStatus(4, "MEDIUM INVENTORY"),
+            InventoryStatus(5, "HIGH INVENTORY"),
             InventoryStatus(6, "VERY HIGH INVENTORY"),
-            InventoryStatus(7, "      MAX INVENTORY"),
-            InventoryStatus(7, "          NO DEMAND", visible=False),
+            InventoryStatus(7, "MAX INVENTORY"),
+            InventoryStatus(7, "NO DEMAND", visible=False),
         ]
 
     def load_commodities(self, base_path: Path):

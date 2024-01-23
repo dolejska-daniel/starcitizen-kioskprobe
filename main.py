@@ -3,7 +3,7 @@ import json
 import logging.config
 from dataclasses import asdict
 from pathlib import Path
-from typing import Sequence, TypedDict
+from typing import Sequence, TypedDict, Callable, Any
 
 import cv2
 import easyocr
@@ -19,7 +19,7 @@ from prompt_toolkit.validation import ValidationError
 from rich.console import Console
 from rich.table import Table
 
-from datarun import DetectedCommodity, DataRunManager, ItemType
+from datarun import DetectedCommodity, DataRunManager
 from enums import *
 from kiosk_probe.uexcorp.api import UEXCorp
 from kiosk_probe.uexcorp.objects import DataRun, DataRunCommodityBuyEntry, DataRunCommoditySellEntry, Commodity
@@ -83,8 +83,6 @@ def convert_node_type(node: TextNode, static_data: StaticData):
         price = price.replace("O", "0")
         price = price.replace(",", ".")
         price = price.strip("/")
-        price = price.lstrip(ascii_letters)
-        price = price[1:]  # remove leading character (misrepresentation of currency symbol)
         price = float(price[:-1]) * 1000 if price.upper().endswith("K") else float(price)
 
         node.value = price
@@ -92,8 +90,8 @@ def convert_node_type(node: TextNode, static_data: StaticData):
         log.debug("parsed commodity price: %f", price)
         return
 
-    inventory_match, distance = find_best_string_match(node.text, static_data.inventory_states, key=lambda i: i.name.strip().upper())
-    distance_max = len(inventory_match.name.strip()) * 0.33
+    inventory_match, distance = find_best_string_match(node.text, static_data.inventory_states, key=lambda i: i.name.upper())
+    distance_max = len(inventory_match.name) * 0.33
     if distance <= distance_max:
         node.type = NodeType.COMMODITY_INVENTORY
         node.value = inventory_match.name
@@ -129,6 +127,9 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
         return [], np.array([])
 
     print(f"Processing {image_name}...")
+    log.info("preprocessing image")
+    remove_currency_symbol(image)
+
     log.info("processing image, shape %s", image.shape)
     texts = reader.readtext(
         image,
@@ -147,7 +148,7 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
         slope_ths=0.25,
         ycenter_ths=0.30,
         height_ths=0.9,
-        width_ths=1.2,
+        width_ths=1.1,
     )
 
     inventory_cutoff_coords = np.array([0, 0])
@@ -234,8 +235,32 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
     return items, image
 
 
-def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer, item_type: ItemType = ItemType.UNDEFINED) -> Sequence[DetectedCommodity]:
+def remove_currency_symbol(image: np.ndarray):
+    log.info("removing templated symbols")
+    static_dir = Path(__file__).parent / "static" / "templates_to_remove"
+    for template_file in static_dir.glob("*"):
+        template_source = cv2.imread(template_file.absolute().as_posix())
+        for scale in np.linspace(0.8, 1.2, 5):
+            template = cv2.resize(template_source, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+            for rotation in [0, 180]:
+                cv2.rotate(template, rotation)
+                template_width, template_height = template.shape[:2]
+                image_grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+
+                match = cv2.matchTemplate(image=image_grey, templ=template_gray, method=cv2.TM_CCOEFF_NORMED)
+
+                (y_points, x_points) = np.where(match >= .8)
+                for (x, y) in zip(x_points, y_points):
+                    color = [int(c) for c in image[y, x - 1]]
+                    cv2.rectangle(image, (x, y), (x + template_width, y + template_height), color, -1)
+
+
+def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer, item_type: ItemType = ItemType.UNDEFINED, before_select: Callable[[], Any] | None = None, sus_attrs: Callable[[DetectedCommodity], list[EditTarget]] | None = None) -> Sequence[DetectedCommodity]:
     while True:
+        if before_select:
+            before_select()
+
         items = list(sorted(items, key=lambda item: item.position_y))
         choices_invalid = [Choice(_id, name=str(item)) for _id, item in enumerate(items) if not item.is_valid()]
         choices_valid = [Choice(_id, name=str(item)) for _id, item in enumerate(items) if item.is_valid()]
@@ -279,13 +304,15 @@ def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer, it
                     break
 
             item = items[item_index]
+            sus_list = sus_attrs(item) if sus_attrs else []
+
             fix_targets: list[EditTarget] = inquirer.select(
                 message="Select attributes to change:",
                 choices=[
-                    Choice(EditTarget.NAME, name="Change COMMODITY", enabled=not item.name),
-                    Choice(EditTarget.PRICE, name="Change PRICE", enabled=not item.price or item.price > 10_000_000),
-                    Choice(EditTarget.STOCK, name="Change STOCK", enabled=not item.stock or item.stock > 100_000),
-                    Choice(EditTarget.INVENTORY, name="Change INVENTORY", enabled=not item.inventory),
+                    Choice(EditTarget.NAME, name="Change COMMODITY", enabled=item.name is None or EditTarget.NAME in sus_list),
+                    Choice(EditTarget.PRICE, name="Change PRICE", enabled=item.price is float("nan") or EditTarget.PRICE in sus_list),
+                    Choice(EditTarget.STOCK, name="Change STOCK", enabled=item.stock is float("nan") or EditTarget.STOCK in sus_list),
+                    Choice(EditTarget.INVENTORY, name="Change INVENTORY", enabled=item.inventory is None or EditTarget.INVENTORY in sus_list),
                 ],
                 multiselect=True,
             ).execute()
@@ -392,7 +419,7 @@ def edit_item_name(item: DetectedCommodity, uexcorp: UEXCorp):
 def edit_item_inventory(item: DetectedCommodity, static_data: StaticData):
     inventory_status_index: int = inquirer.fuzzy(
         message="Select inventory status:",
-        choices=[Choice(_id, name=s.name) for _id, s in enumerate(static_data.inventory_states) if s.visible],
+        choices=[Choice(_id, name=f"{s.name:>19}") for _id, s in enumerate(static_data.inventory_states) if s.visible],
         default=item.inventory.name if item.inventory is not None else None,
     ).execute()
     item.inventory = static_data.inventory_states[inventory_status_index]
@@ -415,7 +442,7 @@ def run(action: Action, deps: DependencyContainer):
         return
 
     try:
-        items, _ = process_image(image, reader, static_data, image_name="clipboard screenshot")
+        items, image_parsed = process_image(image, reader, static_data, image_name="clipboard screenshot")
         log.debug(f"detected items: {items}")
 
     except Exception as e:
@@ -431,8 +458,16 @@ def run(action: Action, deps: DependencyContainer):
             case _:
                 items_type = ItemType.UNDEFINED
 
-        deps.run_manager.item_overview(items, item_type=items_type)
-        edit_items(items, deps)
+        def load_sus_attrs(item: DetectedCommodity) -> list[EditTarget]:
+            prices = deps.uexcorp.get_commodity_price_by_terminal(run_manager.terminal.id, item.commodity.id) if run_manager.terminal is not None else None
+            return run_manager.get_sus_attrs(item, prices, items_type) if prices is not None else []
+
+        items = edit_items(
+            items, deps,
+            item_type=items_type,
+            before_select=lambda: deps.run_manager.item_overview(items, item_type=items_type),
+            sus_attrs=load_sus_attrs,
+        )
 
         # items were fixed through references, it is safe to work with all items
         result_items = list(filter(lambda _item: _item.is_valid(), items))
@@ -445,6 +480,9 @@ def run(action: Action, deps: DependencyContainer):
 
             case _:
                 log.error("unknown action %s", action)
+
+        if len(result_items):
+            run_manager.add_image(image_parsed)
 
     except Exception as e:
         log.exception(f"failed to process detected items: {e}", exc_info=e)
@@ -559,6 +597,15 @@ def commit(deps: DependencyContainer):
 
 
 def commit_new(run_manager: DataRunManager):
+    screenshot_fig, _ = merge_images(
+        run_manager.images,
+        [f"Screenshot {i + 1}" for i in range(len(run_manager.images))],
+        figsize=(5 * len(run_manager.images), 8),
+    )
+    screenshot_base64 = figure_to_base64(screenshot_fig)
+    if deps.settings.include_screenshots:
+        plt.show()
+
     data_run = DataRun(
         id_terminal=run_manager.terminal.id,
         prices=[
@@ -566,9 +613,10 @@ def commit_new(run_manager: DataRunManager):
             *[sell_entry_from_commodity(item) for item in run_manager.sell],
         ],
         is_production=False if deps.settings.dry_run else True,
+        screenshot=screenshot_base64 if deps.settings.include_screenshots else None,
     )
 
-    log.debug("submitting data run: %s", asdict(data_run))
+    log.debug("submitting data run: %s", asdict(data_run, dict_factory=lambda d: {k: v for k, v in d if k != "screenshot"}))
     response = deps.uexcorp.api.submit_data_run(data_run)
 
     log.info("successfully submitted data run (dry run: %s)", deps.settings.dry_run)
@@ -743,6 +791,30 @@ class BenchmarkResults(TypedDict):
     data_inventories: list[str | None]
 
 
+def merge_images(images: list[np.ndarray], titles: list[str], **kwargs) -> tuple[plt.Figure, list[plt.Axes]]:
+    fig, axes = plt.subplots(1, len(images), **kwargs)
+    if len(images) == 1:
+        axes = [axes]
+
+    for _id, image in enumerate(images):
+        axes[_id].imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        axes[_id].set_title(titles[_id])
+        axes[_id].get_xaxis().set_visible(False)
+        axes[_id].get_yaxis().set_visible(False)
+
+    fig.tight_layout()
+    return fig, axes
+
+
+def figure_to_base64(fig: plt.Figure) -> str:
+    import io
+    import base64
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
+
+
 def run_benchmark(images_dir: Path = None, override_results: bool = False):
     images_dir = images_dir or Path(__file__).parent / "images"
     log.info("running benchmark on images in %s", images_dir.absolute())
@@ -779,21 +851,8 @@ def run_benchmark(images_dir: Path = None, override_results: bool = False):
             log.debug("saving processed image to %s", processed_image_path.absolute())
             cv2.imwrite(processed_image_path.absolute().as_posix(), image)
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 10))
         image_previous = cv2.imread(processed_image_path.absolute().as_posix())
-        image_previous = cv2.cvtColor(image_previous, cv2.COLOR_BGR2RGB)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        axes[0].imshow(image_previous)
-        axes[0].set_title("Previous")
-        axes[0].get_xaxis().set_visible(False)
-        axes[0].get_yaxis().set_visible(False)
-
-        axes[1].imshow(image)
-        axes[1].set_title("Current")
-        axes[1].get_xaxis().set_visible(False)
-        axes[1].get_yaxis().set_visible(False)
-
-        fig.tight_layout()
+        fig, axes = merge_images([image_previous, image], ["Previous", "Current"], figsize=(12, 10))
         plt.savefig(image_path.with_name(f"{image_path.stem}-comparison.png").absolute().as_posix())
         plt.close(fig)
 
@@ -838,7 +897,7 @@ def run_benchmark(images_dir: Path = None, override_results: bool = False):
 
             pct = attribute_current / max_value * 100 if max_value else 0
             pct_value = f"{pct:5.1f}%  " if pct > 0 else " " * 8
-            pct_diff = (attribute_current - attribute_previous) / attribute_previous * 100 if attribute_previous else float("inf")
+            pct_diff = (attribute_current - attribute_previous) / attribute_previous * 100 if attribute_previous else float("nan")
 
             row.append(f"{pct_value}{pct_diff:+6.1f}%")
 
@@ -860,7 +919,7 @@ def run_benchmark(images_dir: Path = None, override_results: bool = False):
 
             row.append(f"{pct_value}{pct_diff:+6.1f}%")
 
-        row_style = "bright_green" if success_measure > 0.0 else "dim" if success_measure == 0.0 else "red"
+        row_style = "bright_green" if success_measure > 0.0 else "red" if success_measure < 0.0 else "dim"
         table.add_row(*row, style=row_style)
 
     console = Console()

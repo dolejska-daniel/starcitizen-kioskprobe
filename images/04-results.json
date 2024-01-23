@@ -22,7 +22,7 @@
         170.0,
         372.0,
         388.0,
-        30200004000.0,
+        302.00004,
         555.0
     ],
     "data_stocks": [
@@ -36,13 +36,13 @@
         0.0
     ],
     "data_inventories": [
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK",
-        "       OUT OF STOCK"
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK",
+        "OUT OF STOCK"
     ]
 }

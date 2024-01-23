@@ -33,12 +33,12 @@
         75.0
     ],
     "data_inventories": [
-        " VERY LOW INVENTORY",
-        "      MAX INVENTORY",
-        "      MAX INVENTORY",
+        "VERY LOW INVENTORY",
+        "MAX INVENTORY",
+        "MAX INVENTORY",
         null,
-        " VERY LOW INVENTORY",
-        " VERY LOW INVENTORY",
-        "      MAX INVENTORY"
+        "VERY LOW INVENTORY",
+        "VERY LOW INVENTORY",
+        "MAX INVENTORY"
     ]
 }

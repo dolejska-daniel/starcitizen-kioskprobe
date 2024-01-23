@@ -6,31 +6,31 @@
     "detected_stock_count": 8,
     "detected_inventory_count": 8,
     "data_names": [
+        "Agricium",
+        "Agricultural Supplies",
+        "Aluminum",
         "Astatine",
         "Beryl",
         "Bexalite",
-        "Chlorine",
-        "Copper",
-        "Corundum",
-        "Diamond",
-        "Distilled Spirits"
+        "Borase",
+        "Revenant Tree Pollen"
     ],
     "data_prices": [
+        2688.99989,
+        120.0,
+        315.0,
         900.0,
         2815.99998,
-        7462.99982,
-        170.0,
-        372.0,
-        388.0,
-        4302.00004,
-        555.0
+        46299982000.0,
+        3532.0000600000003,
+        168.0
     ],
     "data_stocks": [
         0.0,
-        149.0,
         0.0,
         0.0,
-        27.0,
+        0.0,
+        1080.0,
         0.0,
         0.0,
         0.0

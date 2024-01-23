@@ -1,14 +1,15 @@
 import logging
-from enum import Enum
 from typing import Sequence
 
+import numpy as np
 from InquirerPy import inquirer
 from InquirerPy.base import Choice
 from rich.console import Console
 from rich.table import Table
 
+from enums import EditTarget, ItemType
 from kiosk_probe.uexcorp.api import UEXCorp
-from kiosk_probe.uexcorp.objects import InventoryStatus, Terminal, Commodity
+from kiosk_probe.uexcorp.objects import InventoryStatus, Terminal, Commodity, CommodityPrice
 
 log = logging.getLogger("kiosk_probe." + __name__)
 
@@ -50,22 +51,22 @@ class DetectedCommodity:
         return self.name is not None and self.commodity is not None and self.price >= 0 and self.stock >= 0 and self.inventory is not None
 
 
-class ItemType(Enum):
-    BUY = "buy"
-    SELL = "sell"
-    UNDEFINED = "undefined"
-
-
 class DataRunManager:
     buy: list[DetectedCommodity]
     sell: list[DetectedCommodity]
+    images: list[np.ndarray]
 
     def __init__(self, uexcorp: UEXCorp):
         self.uexcorp = uexcorp
         log.debug("initializing data run manager")
         self.buy = []
         self.sell = []
+        self.images = []
         self.terminal: Terminal | None = None
+
+    def add_image(self, image: np.ndarray):
+        log.debug("adding image to data run")
+        self.images.append(image)
 
     def add_buy(self, commodity: DetectedCommodity):
         self.buy.append(commodity)
@@ -93,6 +94,7 @@ class DataRunManager:
         log.debug("clearing current data run")
         self.buy.clear()
         self.sell.clear()
+        self.images.clear()
 
     def is_dirty(self):
         return len(self.buy) > 0 or len(self.sell) > 0
@@ -156,26 +158,27 @@ class DataRunManager:
                     change_is_new = True
 
                 else:
+                    sus_attributes = self.get_sus_attrs(item, prices, item_type)
                     match item_type:
                         case ItemType.BUY:
                             price_change_text, price_change = self.percentage_diff(item.price, prices.price_buy)
-                            if not prices.price_buy_min_month <= item.price <= prices.price_buy_max_month:
+                            if EditTarget.PRICE in sus_attributes:
                                 price_change_text = f"[bright_red bold blink]{price_change_text}[/bright_red bold blink]"
                                 change_is_large = True
 
                             stock_change_text, stock_change = self.percentage_diff(item.stock, prices.scu_buy)
-                            if not prices.scu_buy_min_month <= item.stock <= prices.scu_buy_max_month:
+                            if EditTarget.STOCK in sus_attributes:
                                 stock_change_text = f"[bright_red bold blink]{stock_change_text}[/bright_red bold blink]"
                                 change_is_large = True
 
                         case ItemType.SELL:
                             price_change_text, price_change = self.percentage_diff(item.price, prices.price_sell)
-                            if not prices.price_sell_min_month <= item.price <= prices.price_sell_max_month:
+                            if EditTarget.PRICE in sus_attributes:
                                 price_change_text = f"[bright_red bold blink]{price_change_text}[/bright_red bold blink]"
                                 change_is_large = True
 
                             stock_change_text, stock_change = self.percentage_diff(item.stock, prices.scu_sell)
-                            if not prices.scu_sell_min_month <= item.stock <= prices.scu_sell_max_month:
+                            if EditTarget.STOCK in sus_attributes:
                                 stock_change_text = f"[bright_red bold blink]{stock_change_text}[/bright_red bold blink]"
                                 change_is_large = True
 
@@ -264,3 +267,22 @@ class DataRunManager:
 
         except KeyboardInterrupt:
             log.debug("aborting trade port change based on user input")
+
+    def get_sus_attrs(self, item: DetectedCommodity, price: CommodityPrice, item_type: ItemType) -> list[EditTarget]:
+        result = []
+        match item_type:
+            case ItemType.BUY:
+                if not price.price_buy_min_month <= item.price <= price.price_buy_max_month:
+                    result.append(EditTarget.PRICE)
+
+                if not price.scu_buy_min_month <= item.stock <= price.scu_buy_max_month:
+                    result.append(EditTarget.STOCK)
+
+            case ItemType.SELL:
+                if not price.price_sell_min_month <= item.price <= price.price_sell_max_month:
+                    result.append(EditTarget.PRICE)
+
+                if not price.scu_sell_min_month <= item.stock <= price.scu_sell_max_month:
+                    result.append(EditTarget.STOCK)
+
+        return result
