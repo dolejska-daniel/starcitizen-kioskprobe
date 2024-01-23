@@ -1,11 +1,12 @@
 {
-    "item_count": 6,
+    "item_count": 7,
     "valid_item_count": 5,
-    "detected_name_count": 6,
-    "detected_price_count": 6,
-    "detected_stock_count": 6,
-    "detected_inventory_count": 6,
+    "detected_name_count": 7,
+    "detected_price_count": 7,
+    "detected_stock_count": 7,
+    "detected_inventory_count": 7,
     "data_names": [
+        "Beryl",
         "Copper",
         "Corundum",
         "Gold",
@@ -15,6 +16,7 @@
     ],
     "data_prices": [
         NaN,
+        NaN,
         3.0,
         15919.00014,
         344.0,
@@ -22,6 +24,7 @@
         3.0
     ],
     "data_stocks": [
+        NaN,
         4000.0,
         12000.0,
         23.0,
@@ -30,6 +33,7 @@
         75.0
     ],
     "data_inventories": [
+        "LOW INVENTORY",
         "MAX INVENTORY",
         "MAX INVENTORY",
         "LOW INVENTORY",

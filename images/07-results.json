@@ -1,9 +1,9 @@
 {
-    "item_count": 7,
+    "item_count": 8,
     "valid_item_count": 6,
-    "detected_name_count": 7,
-    "detected_price_count": 7,
-    "detected_stock_count": 7,
+    "detected_name_count": 8,
+    "detected_price_count": 8,
+    "detected_stock_count": 8,
     "detected_inventory_count": 7,
     "data_names": [
         "Agricium",
@@ -11,6 +11,7 @@
         "Aluminum",
         "Astatine",
         "Beryl",
+        "Bexalite",
         "Borase",
         "Revenant Tree Pollen"
     ],
@@ -21,6 +22,7 @@
         900.0,
         2815.99998,
         NaN,
+        NaN,
         168.0
     ],
     "data_stocks": [
@@ -29,6 +31,7 @@
         0.0,
         0.0,
         1080.0,
+        NaN,
         0.0,
         0.0
     ],
@@ -38,6 +41,7 @@
         "OUT OF STOCK",
         "OUT OF STOCK",
         "OUT OF STOCK",
+        null,
         "OUT OF STOCK",
         "OUT OF STOCK"
     ]

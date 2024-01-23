@@ -1,16 +1,18 @@
 {
-    "item_count": 3,
+    "item_count": 4,
     "valid_item_count": 0,
-    "detected_name_count": 3,
-    "detected_price_count": 3,
-    "detected_stock_count": 3,
-    "detected_inventory_count": 3,
+    "detected_name_count": 4,
+    "detected_price_count": 4,
+    "detected_stock_count": 4,
+    "detected_inventory_count": 4,
     "data_names": [
         "Copper (Ore)",
         "Iron (Ore)",
-        "Scrap"
+        "Scrap",
+        "Waste"
     ],
     "data_prices": [
+        NaN,
         NaN,
         NaN,
         NaN
@@ -18,11 +20,13 @@
     "data_stocks": [
         245.0,
         247.0,
-        458.0
+        458.0,
+        NaN
     ],
     "data_inventories": [
         "LOW INVENTORY",
         "LOW INVENTORY",
+        "OUT OF STOCK",
         "OUT OF STOCK"
     ]
 }

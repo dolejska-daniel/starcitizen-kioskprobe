@@ -1,12 +1,20 @@
 {
-    "item_count": 0,
+    "item_count": 1,
     "valid_item_count": 0,
-    "detected_name_count": 0,
-    "detected_price_count": 0,
-    "detected_stock_count": 0,
-    "detected_inventory_count": 0,
-    "data_names": [],
-    "data_prices": [],
-    "data_stocks": [],
-    "data_inventories": []
+    "detected_name_count": 1,
+    "detected_price_count": 1,
+    "detected_stock_count": 1,
+    "detected_inventory_count": 1,
+    "data_names": [
+        "Scrap"
+    ],
+    "data_prices": [
+        NaN
+    ],
+    "data_stocks": [
+        NaN
+    ],
+    "data_inventories": [
+        "MAX INVENTORY"
+    ]
 }
