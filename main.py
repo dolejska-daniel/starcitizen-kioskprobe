@@ -180,6 +180,7 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
             continue
 
     items = []
+    used_name_nodes = set()
     for stock_node in filter_by_type(nodes, NodeType.COMMODITY_STOCK):
         stock_node.find_and_connect_bottom(nodes, node_type=NodeType.COMMODITY_PRICE)
         stock_node.find_and_connect_left(nodes, node_type=NodeType.COMMODITY_NAME)
@@ -189,6 +190,7 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
         if name_node is not None:
             name_node.find_and_connect_bottom(nodes, node_type=NodeType.COMMODITY_INVENTORY)
             inventory_node = name_node.bottom
+            used_name_nodes.add(name_node)
 
         commodity: Commodity | None = None
         commodity_name = None
@@ -210,6 +212,25 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
         items.append(result_item)
 
         stock_node.display(image)
+
+    for name_node in filter_by_type(nodes, NodeType.COMMODITY_NAME):
+        if name_node in used_name_nodes:
+            continue
+
+        name_node.find_and_connect_bottom(nodes, node_type=NodeType.COMMODITY_INVENTORY)
+        inventory_node = name_node.bottom
+        commodity_inventory = inventory_node.reference_object if inventory_node is not None else None
+
+        result_item = DetectedCommodity(
+            name=name_node.reference_object.name,
+            commodity=name_node.reference_object,
+            price=None,
+            stock=None,
+            inventory=commodity_inventory,
+            position_y=name_node.boundary_center[1],
+        )
+        items.append(result_item)
+        name_node.display(image)
 
     if deps.settings.show_all_text_nodes:
         for node in nodes:
@@ -310,8 +331,8 @@ def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer, it
                 message="Select attributes to change:",
                 choices=[
                     Choice(EditTarget.NAME, name="Change COMMODITY", enabled=item.name is None or EditTarget.NAME in sus_list),
-                    Choice(EditTarget.PRICE, name="Change PRICE", enabled=item.price is float("nan") or EditTarget.PRICE in sus_list),
-                    Choice(EditTarget.STOCK, name="Change STOCK", enabled=item.stock is float("nan") or EditTarget.STOCK in sus_list),
+                    Choice(EditTarget.PRICE, name="Change PRICE", enabled=(not item.price <= 0 and not item.price >= 0) or EditTarget.PRICE in sus_list),
+                    Choice(EditTarget.STOCK, name="Change STOCK", enabled=(not item.stock <= 0 and not item.stock >= 0) or EditTarget.STOCK in sus_list),
                     Choice(EditTarget.INVENTORY, name="Change INVENTORY", enabled=item.inventory is None or EditTarget.INVENTORY in sus_list),
                 ],
                 multiselect=True,
