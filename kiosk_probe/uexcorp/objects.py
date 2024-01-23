@@ -201,6 +201,8 @@ class CommodityPrice:
     outpost_name: str | None
     city_name: str | None
     faction_name: str
+    terminal_name: str
+    terminal_code: str
 
 
 @dataclass
