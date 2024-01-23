@@ -260,21 +260,21 @@ def remove_currency_symbol(image: np.ndarray):
     log.info("removing templated symbols")
     static_dir = Path(__file__).parent / "static" / "templates_to_remove"
     for template_file in static_dir.glob("*"):
+        log.debug("matching template %s", template_file.absolute().as_posix())
         template_source = cv2.imread(template_file.absolute().as_posix())
-        for scale in np.linspace(0.8, 1.2, 5):
+        for scale in np.linspace(0.9, 1.1, 5):
             template = cv2.resize(template_source, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-            for rotation in [0, 180]:
-                cv2.rotate(template, rotation)
-                template_width, template_height = template.shape[:2]
-                image_grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+            template_height, template_width = template.shape[:2]
+            image_grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
-                match = cv2.matchTemplate(image=image_grey, templ=template_gray, method=cv2.TM_CCOEFF_NORMED)
+            match = cv2.matchTemplate(image=image_grey, templ=template_gray, method=cv2.TM_CCOEFF_NORMED)
 
-                (y_points, x_points) = np.where(match >= .8)
-                for (x, y) in zip(x_points, y_points):
-                    color = [int(c) for c in image[y, x - 1]]
-                    cv2.rectangle(image, (x, y), (x + template_width, y + template_height), color, -1)
+            (y_points, x_points) = np.where(match >= .75)
+            for (x, y) in zip(x_points, y_points):
+                log.debug("removing matched template at (%d, %d)", x, y)
+                color = [int(c) for c in image[y, x - 1]]
+                cv2.rectangle(image, (x, y), (x + template_width, y + template_height), color, -1)
 
 
 def edit_items(items: Sequence[DetectedCommodity], deps: DependencyContainer, item_type: ItemType = ItemType.UNDEFINED, before_select: Callable[[], Any] | None = None, sus_attrs: Callable[[DetectedCommodity], list[EditTarget]] | None = None) -> Sequence[DetectedCommodity]:
