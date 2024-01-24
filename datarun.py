@@ -10,18 +10,21 @@ from rich.table import Table
 from enums import EditTarget, ItemType
 from kiosk_probe.uexcorp.api import UEXCorp
 from kiosk_probe.uexcorp.objects import InventoryStatus, Terminal, Commodity, CommodityPrice
+from utils import TextNode
 
 log = logging.getLogger("kiosk_probe." + __name__)
 
 
 class DetectedCommodity:
-    def __init__(self, name: str | None, commodity: Commodity | None, price: float | None, stock: float | None, inventory: InventoryStatus | None = None, position_y: int | None = None):
+    def __init__(self, name: str | None, commodity: Commodity | None, price: float | None, stock: float | None,
+                 inventory: InventoryStatus | None = None, position_y: int | None = None, source_node: TextNode | None = None):
         self.name = name
         self.commodity = commodity
         self.price = price if price is not None else float("nan")
         self.stock = stock if stock is not None else float("nan")
         self.inventory = inventory
         self.position_y = position_y
+        self.source_node = source_node
         self.trust = 1.0
 
     def __repr__(self):
@@ -49,6 +52,14 @@ class DetectedCommodity:
 
     def is_valid(self):
         return self.name is not None and self.commodity is not None and self.price >= 0 and self.stock >= 0 and self.inventory is not None
+
+    def get_all_nodes(self) -> set[TextNode]:
+        result = set()
+        if self.source_node is not None:
+            result.add(self.source_node)
+            result.update(self.source_node.get_connected())
+
+        return result
 
 
 class DataRunManager:

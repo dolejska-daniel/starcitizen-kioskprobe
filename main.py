@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging.config
+import math
 from dataclasses import asdict
 from pathlib import Path
 from typing import Sequence, TypedDict, Callable, Any
@@ -121,7 +122,7 @@ def convert_node_type(node: TextNode, static_data: StaticData):
 
 
 def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: StaticData, image_name: str = "image") \
-        -> tuple[list[DetectedCommodity], np.ndarray]:
+        -> list[DetectedCommodity]:
     if image is None or len(image.shape) != 3:
         log.error("failed to read image for processing, shape %s", image.shape if image is not None else None)
         return [], np.array([])
@@ -208,10 +209,9 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
             stock=commodity_stock,
             inventory=commodity_inventory,
             position_y=stock_node.boundary_center[1],
+            source_node=stock_node,
         )
         items.append(result_item)
-
-        stock_node.display(image)
 
     for name_node in filter_by_type(nodes, NodeType.COMMODITY_NAME):
         if name_node in used_name_nodes:
@@ -228,32 +228,29 @@ def process_image(image: np.ndarray, reader: easyocr.Reader, static_data: Static
             stock=None,
             inventory=commodity_inventory,
             position_y=name_node.boundary_center[1],
+            source_node=name_node,
         )
         items.append(result_item)
-        name_node.display(image)
 
     if deps.settings.show_all_text_nodes:
         for node in nodes:
             node.display(image)
 
-    min_coordinate = (np.inf, np.inf)
-    max_coordinate = (-np.inf, -np.inf)
+    return items
+
+
+def crop_image(image: np.ndarray, nodes: list[TextNode], margin: int = 15) -> np.ndarray:
+    margin_vector = np.array([margin, margin])
+    min_coordinate = image.shape[1], image.shape[0]
+    max_coordinate = (0, 0)
     for node in filter(lambda n: n.type != NodeType.UNKNOWN, nodes):
         for boundary_coord in node.bounds:
-            min_coordinate = np.minimum(min_coordinate, boundary_coord)
-            max_coordinate = np.maximum(max_coordinate, boundary_coord)
+            min_coordinate = np.minimum(min_coordinate, boundary_coord - margin_vector)
+            max_coordinate = np.maximum(max_coordinate, boundary_coord + margin_vector)
 
-    if deps.settings.crop_resulting_image:
-        min_x, min_y = int(min_coordinate[0]), int(min_coordinate[1])
-        max_x, max_y = int(max_coordinate[0]), int(max_coordinate[1])
-        image = image[min_y:max_y, min_x:max_x]
-
-    if deps.settings.show_images:
-        image_converted = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        plt.imshow(image_converted)
-        plt.show()
-
-    return items, image
+    min_x, min_y = int(min_coordinate[0]), int(min_coordinate[1])
+    max_x, max_y = int(max_coordinate[0]), int(max_coordinate[1])
+    return image[min_y:max_y, min_x:max_x]
 
 
 def remove_currency_symbol(image: np.ndarray):
@@ -270,7 +267,7 @@ def remove_currency_symbol(image: np.ndarray):
 
             match = cv2.matchTemplate(image=image_grey, templ=template_gray, method=cv2.TM_CCOEFF_NORMED)
 
-            (y_points, x_points) = np.where(match >= .75)
+            (y_points, x_points) = np.where(match >= .85)
             for (x, y) in zip(x_points, y_points):
                 log.debug("removing matched template at (%d, %d)", x, y)
                 color = [int(c) for c in image[y, x - 1]]
@@ -463,7 +460,8 @@ def run(action: Action, deps: DependencyContainer):
         return
 
     try:
-        items, image_parsed = process_image(image, reader, static_data, image_name="clipboard screenshot")
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        items = process_image(image, reader, static_data, image_name="clipboard screenshot")
         log.debug(f"detected items: {items}")
 
     except Exception as e:
@@ -491,7 +489,7 @@ def run(action: Action, deps: DependencyContainer):
         )
 
         # items were fixed through references, it is safe to work with all items
-        result_items = list(filter(lambda _item: _item.is_valid(), items))
+        result_items = [i for i in items if i.is_valid()]
         match action:
             case Action.PROCESS_BUY:
                 run_manager.extend_buy(result_items)
@@ -503,6 +501,14 @@ def run(action: Action, deps: DependencyContainer):
                 log.error("unknown action %s", action)
 
         if len(result_items):
+            nodes_to_display = set()
+            for item in result_items:
+                if item.source_node is not None:
+                    log.debug("displaying source nodes for item %s", item)
+                    item.source_node.display(image)
+                    nodes_to_display.update(item.get_all_nodes())
+
+            image_parsed = crop_image(image, list(nodes_to_display)) if deps.settings.crop_resulting_image else image
             run_manager.add_image(image_parsed)
 
     except Exception as e:
@@ -555,10 +561,14 @@ def commit(deps: DependencyContainer):
     run_manager.change_terminal(deps.uexcorp)
 
     def confirm_submission() -> bool:
+        dry_run_info = ""
+        if deps.settings.dry_run:
+            dry_run_info = " [DRY RUN]"
+
         print()
         run_manager.item_overview(run_manager.buy, prefix="Tracked BUY contains", item_type=ItemType.BUY)
         run_manager.item_overview(run_manager.sell, prefix="Tracked SELL contains", item_type=ItemType.SELL)
-        return inquirer.confirm(message="Proceed with submission?", default=True).execute()
+        return inquirer.confirm(message="Proceed with submission?" + dry_run_info, default=True).execute()
 
     while not confirm_submission():
         action: CommitRejectAction = inquirer.select(
@@ -621,10 +631,10 @@ def commit_new(run_manager: DataRunManager):
     screenshot_fig, _ = merge_images(
         run_manager.images,
         [f"Screenshot {i + 1}" for i in range(len(run_manager.images))],
-        figsize=(5 * len(run_manager.images), 8),
+        figure_size_base=(5, 8),
     )
     screenshot_base64 = figure_to_base64(screenshot_fig)
-    if deps.settings.include_screenshots:
+    if deps.settings.include_screenshots and deps.settings.show_images:
         plt.show()
 
     data_run = DataRun(
@@ -812,14 +822,23 @@ class BenchmarkResults(TypedDict):
     data_inventories: list[str | None]
 
 
-def merge_images(images: list[np.ndarray], titles: list[str], **kwargs) -> tuple[plt.Figure, list[plt.Axes]]:
-    fig, axes = plt.subplots(1, len(images), **kwargs)
-    if len(images) == 1:
+def merge_images(images: list[np.ndarray], titles: list[str], max_cols: int = 3, figure_size_base: tuple[int, int] = None, **kwargs) -> tuple[plt.Figure, list[plt.Axes]]:
+    figure_size = figure_size_base or (5, 8)
+    rows, cols = math.ceil(len(images) / float(max_cols)), min(len(images), max_cols)
+    figure_size = (figure_size[0] * cols, figure_size[1] * rows)
+    fig, axes = plt.subplots(rows, cols, figsize=figure_size, **kwargs)
+    if rows > 1 and cols > 1:
+        axes = axes.flat
+    elif rows > 1 or cols > 1:
+        axes = axes
+    else:
         axes = [axes]
 
     for _id, image in enumerate(images):
         axes[_id].imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         axes[_id].set_title(titles[_id])
+
+    for _id in range(rows * cols):
         axes[_id].get_xaxis().set_visible(False)
         axes[_id].get_yaxis().set_visible(False)
 

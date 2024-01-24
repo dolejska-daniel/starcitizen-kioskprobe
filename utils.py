@@ -228,3 +228,12 @@ class TextNode:
         if len(nodes):
             closest_node = nodes[0]
             self.left = closest_node
+
+    def get_connected(self) -> set["TextNode"]:
+        nodes = set()
+        for node in [self.top, self.right, self.bottom, self.left]:
+            if node is not None:
+                nodes.add(node)
+                nodes.update(node.get_connected())
+
+        return nodes
