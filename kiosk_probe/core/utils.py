@@ -9,7 +9,7 @@ T = TypeVar("T")
 
 
 def merge_images(images: list[np.ndarray], titles: list[str], max_cols: int = 3, figure_size_base: tuple[int, int] = None, **kwargs) -> tuple[plt.Figure, list[plt.Axes]]:
-    figure_size = figure_size_base or (5, 8)
+    figure_size = figure_size_base or (5, 5)
     rows, cols = math.ceil(len(images) / float(max_cols)), min(len(images), max_cols)
     figure_size = (figure_size[0] * cols, figure_size[1] * rows)
     if "figsize" not in kwargs:
