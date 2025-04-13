@@ -6,19 +6,23 @@ from pathlib import Path
 import cv2
 import numpy as np
 from openai import OpenAI
+from openai.types.responses import ResponseUsage
 from rich.progress import Progress
 
 from kiosk_probe.core.datarun.objects import DetectedCommodity
-from kiosk_probe.core.output import UserOutput
 from kiosk_probe.core.processing.objects import InventoryEntriesResponse, InventoryEntry, InventoryAvailability
+from kiosk_probe.core.utils import find_best_string_match
 from kiosk_probe.uex_corp.objects import Commodity, InventoryStatus
 from main import DependencyContainer
-from kiosk_probe.core.utils import find_best_string_match
 
 log = logging.getLogger("kiosk_probe." + __name__)
 
 
 class ImageProcessing:
+
+    tokens_used: int = 0
+    tokens_cached: int = 0
+    reported_tokens_used: int = 0
 
     def __init__(self, deps: DependencyContainer):
         self.deps = deps
@@ -48,33 +52,31 @@ class ImageProcessing:
 
     def detect_inventory_entries(self, image: np.ndarray, image_name: str) -> tuple[np.ndarray, InventoryEntriesResponse]:
         with Progress(transient=True) as progress:
-            task_id = progress.add_task("Preprocessing...", total=None)
             log.debug("pre-processing %s", image_name)
+            task_id = progress.add_task("Preprocessing...", total=None)
 
             image_used = self.crop_image(image)
             image_used = cv2.cvtColor(image_used, cv2.COLOR_BGR2RGB)
             _, image_used_png = cv2.imencode('.png', image_used)
 
+            from matplotlib import pyplot as plt
+            plt.imshow(image_used)
+            plt.show()
+
             image_used_base64 = base64.b64encode(image_used_png.tobytes()).decode("ascii")
             image_used_base64 = f"data:image/png;base64,{image_used_base64}"
 
-            progress.update(task_id, description=f"Prompting...")
             log.debug("processing %s", image_name)
+            progress.update(task_id, description=f"Prompting...")
             response = self.client.responses.create(
                 model=self.config.model,
                 input=[
                     {
-                        "role": "system",
+                        "role": "developer",
                         "content": [
                             {
                                 "type": "input_text",
-                                "text": """
-                                Screen capture with a list of entries.
-                                Each entry has a `entry_name` and `entry_availability` on the left and `entry_stock` and `entry_price` on the right.
-                                Prices may have SI suffixes.
-                                Do not parse numeric values, only determine text contents for all properties.
-                                If some are incomplete, report the properties you detected with null values otherwise.
-                                """,
+                                "text": "Screen capture with a list of entries. Each entry has a `entry_name` and `entry_availability` on the left and `entry_stock` and `entry_price` on the right. Prices may have SI suffixes. Do not parse numeric values, only determine text contents for all properties. If some are incomplete, report the properties you detected with null values otherwise.""",
                             }
                         ]
                     },
@@ -98,10 +100,20 @@ class ImageProcessing:
                 store=True,
             )
 
-            progress.update(task_id, description=f"Processing response...")
             log.debug("parsing detection response")
+            progress.update(task_id, description=f"Processing response...")
+            self.track_usage(response.usage)
             response_content = json.loads(response.output_text)
             return image_used, InventoryEntriesResponse(**response_content)
+
+    def track_usage(self, usage: ResponseUsage):
+        log.info("used %d input tokens (%d cached)", usage.input_tokens, usage.input_tokens_details.cached_tokens)
+        log.info("used %d output tokens (%d reasoning)", usage.output_tokens, usage.output_tokens_details.reasoning_tokens)
+
+        self.tokens_used += usage.total_tokens
+        self.tokens_cached += usage.input_tokens_details.cached_tokens
+        if self.tokens_used - self.reported_tokens_used > self.config.report_tokens_used:
+            self.deps.output.report_note(f"Tokens used this session so far: {self.tokens_used} ({self.tokens_cached} cached)")
 
     def find_commodity(self, entry: InventoryEntry) -> Commodity:
         commodities = self.deps.uex_corp.api.get_commodities()

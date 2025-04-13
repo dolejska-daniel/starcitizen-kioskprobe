@@ -12,6 +12,7 @@ class ResponseBase(TypedDict):
 class OpenAIApiConfig:
     api_key: str
     model: str
+    report_tokens_used: int = field(default=100_000)
 
 
 @dataclass
