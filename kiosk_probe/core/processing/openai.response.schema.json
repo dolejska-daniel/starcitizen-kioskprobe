@@ -1,0 +1,65 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "name": "inventory_entries",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "entries": {
+                "type": "array",
+                "description": "Collection of inventory entries.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "entry_name": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "description": "Name of the inventory entry."
+                        },
+                        "entry_availability": {
+                            "description": "Availability status of the entry.",
+                            "enum": [
+                                "OUT OF STOCK",
+                                "VERY LOW INVENTORY",
+                                "LOW INVENTORY",
+                                "MEDIUM INVENTORY",
+                                "HIGH INVENTORY",
+                                "VERY HIGH INVENTORY",
+                                "MAX INVENTORY",
+                                "NO DEMAND",
+                                "undetected"
+                            ]
+                        },
+                        "entry_stock": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "description": "Current stock level of the entry."
+                        },
+                        "entry_price": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "description": "Price of the inventory entry."
+                        }
+                    },
+                    "required": [
+                        "entry_name",
+                        "entry_availability",
+                        "entry_stock",
+                        "entry_price"
+                    ],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": [
+            "entries"
+        ],
+        "additionalProperties": false
+    },
+    "strict": true
+}
