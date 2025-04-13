@@ -1,12 +1,15 @@
 # Star Citizen Kiosk Probe
 
-<img src="https://uexcorp.space/img/api/uex-api-badge-powered.png" alt="Powered by https://uexcorp.space" width="100" title="Power by UEX Corp">
+Hi!
+Welcome to this tiny project of mine.
+This solution aims to provide a simple (=automated, for the most part) way to extract commodity prices from appropriate terminals ([Admin](https://uexcorp.space/terminals/info/name/admin-everus-harbor/), [TDD](https://uexcorp.space/terminals/info/name/tdd-trade-and-development-division-area-18/)s, [Outpost](https://uexcorp.space/terminals/info/name/hickes-research-outpost/)s, ...) in the data-running services of [UEX Corp.](https://uexcorp.space/) in [Star Citizen's Persistent Universe](https://robertsspaceindustries.com/en/star-citizen).
 
-Hi, welcome to this tiny project.
-This solution aims to provide a simple way to extract prices from commodity terminals ([Admin](https://uexcorp.space/terminals/info/name/admin-everus-harbor/), [TDD](https://uexcorp.space/terminals/info/name/tdd-trade-and-development-division-area-18/), [Outpost](https://uexcorp.space/terminals/info/name/hickes-research-outpost/), ...) in Star Citizen.
+<img src="https://uexcorp.space/img/api/uex-api-badge-powered.png" alt="Powered by https://uexcorp.space" width="150" title="Power by UEX Corp">
 
-Unfortunately this solution requires the use of [OpenAI's API](https://platform.openai.com/) tools and hence is **not free** to use.
-Attempts were made to implement a local free solution as well; however, this has proven to be pretty unreliable, especially between different terminal designs (colours, fonts, noise, artefacts).
+Unfortunately this solution requires the use of [OpenAI's API](https://platform.openai.com/) tools and hence is currently <span style="color: red">**not free**</span> to use.
+Attempts were made to implement a local and free solution as well; however, this has proven to be pretty unreliable, especially between different terminal designs (colours, fonts, noise, artefacts).
+
+![Usage Example](./docs/10-full-view.png)
 
 ## Installation instructions
 
@@ -43,12 +46,43 @@ These could be, for example:
 - or `gpt-4.5-preview` which rarely does some mistakes but is currently 500x more expensive than `gpt-4o-mini`.
 
 ## Usage
+
 Run the following commands in the project root directory to start the program:
 1. `source venv/bin/activate`
 2. `python3 main.py`
 
-After the program has started, you can use the CLI to interact with it.
-The CLI is a simple text-based interface that allows you to select commands and actions to take.
+You can also use the convenience PowerShell script `./run.ps1` on Windows.
+I recommend creating icon (`.Ink`) link to this script on your desktop for simple launch experience.
+After the program has started, you can use the command line (CLI) to interact with it.
+The CLI is a simple text-based interface that allows you to select actions to take and provide user input when necessary.
+
+First select your current terminal.
+Autocomplete is available, so the easiest place to start if you are not sure what the terminal name is exactly is to type in the planet/moon name.
+
+![Terminal Selection](./docs/02-terminal-autocomplete.png)
 
 The images for analysis are grabbed directly from clipboard.
-Either copy an image to clipboard or take a screenshot and select any `Process` command.
+Either copy an image to clipboard or take a screenshot using `prt sc` button and then select appropriate `Process` command.
+
+![Screenshot Processing](./docs/03-screenshot-processing.png)
+
+After the screenshot has been processed the data are validated against last month min/max values.
+This step allows manual item modifications to fix potential errors.
+One such example can be seen in the picture below - `SCRAP` price has been identified incorrectly and the detected price is shown to differ by `-99.9` from the expected value.
+This clearly indicates incorrect image processing.
+
+![Detected Item Overview](./docs/04-validation.png)
+
+| Select attributes to modify              | Modify values with validation                       |
+|------------------------------------------|-----------------------------------------------------|
+| ![Item Modification](./docs/05-edit.png) | ![Item Modification](./docs/06-edit-validation.png) |
+
+After processing a screenshot the process may be repeated to include commodities that were not previously visible.
+This also allows processing commodities from two different tabs (buy/sell) in one upload.
+Once you are happy with the tracked commodity collection and its values they can be _commited_ — sent to the UEX Corp. database.
+
+![Pre-commit Overview](./docs/07-commit.png)
+
+![Post-commit Summary](./docs/09-submitted.png)
+
+After successfully commiting the data, you can immediately browse the created entries on the UEX Corp. website and/or continue with data-running.
