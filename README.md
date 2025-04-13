@@ -7,7 +7,10 @@ This solution aims to provide a simple (=automated, for the most part) way to ex
 [<img src="https://uexcorp.space/img/api/uex-api-badge-powered.png" alt="Powered by https://uexcorp.space" width="150" title="Power by UEX Corp">](https://uexcorp.space)
 
 Unfortunately this solution requires the use of [OpenAI's API](https://platform.openai.com/) tools and hence is currently <span style="color: red">**not free**</span> to use.
-Attempts were made to implement a local and free solution as well; however, this has proven to be pretty unreliable, especially between different terminal designs (colours, fonts, noise, artefacts).
+Attempts were made to implement a local and free solution as well; however, this has proven to be pretty unreliable, especially between different in-game terminal designs (colours, fonts, noise, artefacts).
+A single image prompt results in consumption of roughly 26k tokens.
+With the [current pricing](https://platform.openai.com/docs/pricing) of USD 0.15/1M tokens for `gpt-4o-mini` that equals to a price tag of USD 0.0039 per image (about 256 prompts for a single dollar).
+A complete mapping of a single terminal takes about 1-4 prompts (based on number of commodities bought/sold).
 
 ![Usage Example](./docs/10-full-view.png)
 
