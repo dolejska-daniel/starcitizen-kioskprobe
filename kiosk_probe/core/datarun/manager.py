@@ -249,17 +249,21 @@ class DataRunManager:
         result = []
         match item_type:
             case ItemType.BUY:
-                if not price.price_buy_min_month <= item.price <= price.price_buy_max_month:
+                if item.price < price.price_buy_min_month \
+                        or item.price > price.price_buy_max_month:
                     result.append(EditTarget.PRICE)
 
-                if not price.scu_buy_min_month <= item.stock <= price.scu_buy_max_month:
+                if item.stock < price.scu_buy_min_month \
+                        or item.stock > price.scu_buy_max_month:
                     result.append(EditTarget.STOCK)
 
             case ItemType.SELL:
-                if not price.price_sell_min_month <= item.price <= price.price_sell_max_month:
+                if item.price < price.price_sell_min_month \
+                        or item.stock > price.price_sell_max_month:
                     result.append(EditTarget.PRICE)
 
-                if not price.scu_sell_min_month <= item.stock <= price.scu_sell_max_month:
+                if item.stock < price.scu_sell_min_month \
+                        or item.stock > price.scu_sell_max_month:
                     result.append(EditTarget.STOCK)
 
         return result
