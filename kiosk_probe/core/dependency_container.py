@@ -7,7 +7,7 @@ class DependencyContainer:
 
     def __init__(self):
         from kiosk_probe.core.datarun.manager import DataRunManager
-        from kiosk_probe.core.processing import ImageProcessing
+        from kiosk_probe.core.processing.image_processing import ImageProcessing
         from kiosk_probe.uex_corp.api import UEXCorp
         from kiosk_probe.core.settings import Settings
         from kiosk_probe.core.static_data import StaticData

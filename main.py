@@ -17,7 +17,7 @@ logging.config.fileConfig(logging_config_file.absolute())
 log = logging.getLogger("kiosk_probe." + __name__)
 
 
-if __name__ == '__main__':
+def main():
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", action="store", help="run for a single image", type=Path)
@@ -48,3 +48,7 @@ if __name__ == '__main__':
         log.exception(f"an unrecoverable error has occurred: {e}", exc_info=e)
         print("Press any key to exit . . . ")
         readchar.readchar()
+
+
+if __name__ == '__main__':
+    main()
