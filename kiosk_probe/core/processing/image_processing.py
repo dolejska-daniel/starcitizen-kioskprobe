@@ -59,9 +59,10 @@ class ImageProcessing:
             image_used = cv2.cvtColor(image_used, cv2.COLOR_BGR2RGB)
             _, image_used_png = cv2.imencode('.png', image_used)
 
-            from matplotlib import pyplot as plt
-            plt.imshow(image_used)
-            plt.show()
+            if self.deps.settings.show_images:
+                from matplotlib import pyplot as plt
+                plt.imshow(image_used)
+                plt.show()
 
             image_used_base64 = base64.b64encode(image_used_png.tobytes()).decode("ascii")
             image_used_base64 = f"data:image/png;base64,{image_used_base64}"
@@ -139,6 +140,7 @@ class ImageProcessing:
             price=entry.price,
             stock=entry.stock,
             inventory_status=self.get_inventory_status(entry.availability),
+            container_sizes=None,
             order=index,
             commodity=self.find_commodity(entry),
         )
