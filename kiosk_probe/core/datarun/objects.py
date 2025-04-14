@@ -1,13 +1,16 @@
+from kiosk_probe.core.enums import ContainerSize
 from kiosk_probe.uex_corp.objects import InventoryStatus, Commodity, DataRunCommodityBuyEntry, DataRunCommoditySellEntry
 
 
 class DetectedCommodity:
-    def __init__(self, name: str | None, commodity: Commodity | None, price: float | None, stock: float | None, inventory_status: InventoryStatus | None, order: int):
+
+    def __init__(self, name: str | None, commodity: Commodity | None, price: float | None, stock: float | None, inventory_status: InventoryStatus | None, container_sizes: list[ContainerSize] | None, order: int):
         self.name = name
         self.commodity = commodity
         self.price = price if price is not None else float("nan")
         self.stock = stock if stock is not None else float("nan")
         self.inventory_status = inventory_status
+        self.container_sizes = container_sizes
         self.order = order
         self.trust = 1.0
 

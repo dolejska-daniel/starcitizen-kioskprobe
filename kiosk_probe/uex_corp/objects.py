@@ -35,6 +35,16 @@ class InventoryStatus:
 
 
 @dataclass
+class CommodityContainerSize:
+    value: int | None
+    name: str
+    visible: bool = field(default=True)
+
+    def __str__(self):
+        return self.name
+
+
+@dataclass
 class Commodity:
     id: int
     id_parent: int
@@ -291,6 +301,7 @@ class DataRunCommoditySellEntry:
 class DataRun:
     id_terminal: int
     prices: list[DataRunCommodityBuyEntry | DataRunCommoditySellEntry]
+    container_sizes: str | None = field(default=None)
     faction_affinity: int | None = field(default=None)
     details: str | None = field(default=None)
     game_version: str | None = field(default=None)

@@ -19,7 +19,7 @@ from kiosk_probe.core.datarun.objects import DetectedCommodity
 from kiosk_probe.core.dependency_container import DependencyContainer
 from kiosk_probe.core.enums import *
 from kiosk_probe.core.validators import FloatValidator
-from kiosk_probe.uex_corp.objects import DataRun, InventoryStatus
+from kiosk_probe.uex_corp.objects import DataRun
 from kiosk_probe.core.utils import figure_to_base64, merge_images
 
 log = logging.getLogger("kiosk_probe." + __name__)
@@ -33,42 +33,45 @@ class Controls:
     def edit_items(self,
                    items: Sequence[DetectedCommodity],
                    item_type: ItemType = ItemType.UNDEFINED,
-                   before_select: Callable[[], Any] | None = None,
                    sus_attrs: Callable[[DetectedCommodity], list[EditTarget]] | None = None,
-                   sort_by: Callable[[DetectedCommodity], Any] = lambda i: i.order
+                   sort_by: Callable[[DetectedCommodity], Any] = lambda i: i.order,
+                   show_items: bool = True,
                    ) -> Sequence[DetectedCommodity]:
         while True:
-            if before_select:
-                before_select()
+            if show_items:
+                print()
+                self.deps.run_manager.item_overview(items, item_type=item_type)
 
             items = list(sorted(items, key=sort_by))
             choices_invalid = [Choice(_id, name=str(item)) for _id, item in enumerate(items) if not item.is_valid()]
             choices_valid = [Choice(_id, name=str(item)) for _id, item in enumerate(items) if item.is_valid()]
-            item_index: int | None = inquirer.select(
-                message="Select an item to edit:",
-                choices=[
-                    # invalid items
-                    Choice(EditAction.ADD_NEW, name="ADD new item"),
-                    *([Choice(EditAction.FINALIZE, name="DISCARD invalid items")] if len(choices_invalid) else []),
-                    Separator(),
-                    *choices_invalid,
-                    # valid items
-                    *([Separator()] if len(choices_invalid) and len(choices_valid) else []),
-                    *choices_valid,
-                    # other options
-                    Separator(),
-                    *([Choice(EditAction.FINALIZE, name="FINISH editing")] if len(choices_invalid) == 0 else []),
-                    *([Choice(EditAction.DISCARD_SELECTED, name="DISCARD selected")] if len(items) else []),
-                    *([Choice(EditAction.DISCARD_ALL, name="DISCARD ALL")] if len(items) else []),
-                ],
-                default=EditAction.FINALIZE,
-            ).execute()
 
             try:
+                item_index: int | None = inquirer.select(
+                    message="Select an item to edit:",
+                    choices=[
+                        # invalid items
+                        Choice(EditAction.ADD_NEW, name="Manually ADD new item"),
+                        *([Choice(EditAction.FINALIZE, name="DISCARD invalid items")] if len(choices_invalid) else []),
+                        *([Separator()] if len(choices_invalid) else []),
+                        *choices_invalid,
+                        # valid items
+                        *([Separator()] if len(choices_invalid) and len(choices_valid) else []),
+                        *choices_valid,
+                        # other options
+                        Separator(),
+                        *([Choice(EditAction.FINALIZE, name="FINISH editing")] if len(choices_invalid) == 0 else []),
+                        *([Choice(EditAction.DISCARD_SELECTED, name="DISCARD selected")] if len(items) else []),
+                        *([Choice(EditAction.DISCARD_ALL, name="DISCARD ALL")] if len(items) else []),
+                    ],
+                    default=0 if len(choices_invalid) else EditAction.ADD_NEW if not len(choices_valid) else EditAction.FINALIZE,
+                ).execute()
+
                 match item_index:
                     case EditAction.ADD_NEW:
                         new_item = self.add_item(item_type=item_type)
-                        items.append(new_item)
+                        if new_item:
+                            items.append(new_item)
                         continue
 
                     case EditAction.FINALIZE:
@@ -144,12 +147,12 @@ class Controls:
                             self.edit_item_inventory(item)
                             item.trust = float("inf")
 
-            except Exception as e:
-                log.exception(f"failed to process changes to item: {e}", exc_info=e)
-                continue
-
             except KeyboardInterrupt:
                 log.debug("aborting fix based on user input")
+                break
+
+            except Exception as e:
+                log.exception(f"failed to process changes to item: {e}", exc_info=e)
                 continue
 
             finally:
@@ -160,7 +163,7 @@ class Controls:
         return self.deps.run_manager.filter_untrusted(items)
 
 
-    def edit_item_stock(self, item):
+    def edit_item_stock(self, item) -> bool:
         try:
             item.stock = inquirer.text(
                 message="Enter stock:",
@@ -168,12 +171,13 @@ class Controls:
                 filter=lambda result: float(result),
                 transformer=lambda result: "%s SCU" % result,
             ).execute()
+            return True
 
         except KeyboardInterrupt:
-            return
+            return False
 
 
-    def edit_item_price(self, item):
+    def edit_item_price(self, item) -> bool:
         try:
             item.price = inquirer.text(
                 message="Enter price:",
@@ -181,12 +185,13 @@ class Controls:
                 filter=lambda result: float(result),
                 transformer=lambda result: "%s aUEC" % result,
             ).execute()
+            return True
 
         except KeyboardInterrupt:
-            return
+            return False
 
 
-    def edit_item_name(self, item: DetectedCommodity):
+    def edit_item_name(self, item: DetectedCommodity) -> bool:
         try:
             commodity_id: int = inquirer.fuzzy(
                 message="Select commodity:",
@@ -195,21 +200,23 @@ class Controls:
             commodity = self.deps.uex_corp.get_commodity_by_id(commodity_id)
             item.name = commodity.name
             item.commodity = commodity
+            return True
 
         except KeyboardInterrupt:
-            return
+            return False
 
 
-    def edit_item_inventory(self, item: DetectedCommodity):
+    def edit_item_inventory(self, item: DetectedCommodity) -> bool:
         try:
             inventory_status_index: int = inquirer.fuzzy(
                 message="Select inventory status:",
                 choices=[Choice(_id, name=f"{s.name:>19}") for _id, s in enumerate(self.deps.static_data.inventory_states) if s.visible],
             ).execute()
             item.inventory_status = self.deps.static_data.inventory_states[inventory_status_index]
+            return True
 
         except KeyboardInterrupt:
-            return
+            return False
 
 
     def run(self, action: Action):
@@ -218,18 +225,20 @@ class Controls:
         try:
             clipboard_image = ImageGrab.grabclipboard()
             clipboard_image = np.array(clipboard_image)
-            if len(clipboard_image.shape) != 3:
-                self.deps.output.report_warning("There is no image in the clipboard.")
-                return
 
         except Exception as e:
             log.exception(f"failed to grab clipboard image: {e}", exc_info=e)
             return
 
         try:
-            clipboard_image = cv2.cvtColor(clipboard_image, cv2.COLOR_RGB2BGR)
-            image_used, items = self.deps.image_processing.process_image(clipboard_image, image_name="clipboard screenshot")
-            log.debug(f"detected items: {items}")
+            items = []
+            if len(clipboard_image.shape) == 3:
+                clipboard_image = cv2.cvtColor(clipboard_image, cv2.COLOR_RGB2BGR)
+                image_used, items = self.deps.image_processing.process_image(clipboard_image, image_name="clipboard screenshot")
+                log.debug(f"detected items: {items}")
+
+            else:
+                self.deps.output.report_note("There is no image in the clipboard.")
 
         except Exception as e:
             log.exception(f"failed to process image: {e}", exc_info=e)
@@ -248,14 +257,9 @@ class Controls:
                 prices = self.deps.uex_corp.get_commodity_price_by_terminal(run_manager.terminal.id, item.commodity.id) if run_manager.terminal is not None and item.commodity is not None else None
                 return run_manager.get_sus_attrs(item, prices, items_type) if prices is not None else []
 
-            def print_overview():
-                print()
-                self.deps.run_manager.item_overview(items, item_type=items_type)
-
             items = self.edit_items(
                 items,
                 item_type=items_type,
-                before_select=print_overview,
                 sus_attrs=load_sus_attrs,
             )
 
@@ -279,7 +283,7 @@ class Controls:
             return
 
 
-    def add_item(self, item_type: ItemType = ItemType.UNDEFINED) -> DetectedCommodity:
+    def add_item(self, item_type: ItemType = ItemType.UNDEFINED) -> DetectedCommodity | None:
         if item_type == ItemType.UNDEFINED:
             item_type = inquirer.select(
                 message="Select item category:",
@@ -295,14 +299,23 @@ class Controls:
             price=0,
             stock=0,
             inventory_status=None,
+            container_sizes=None,
             order=0,
         )
 
-        self.edit_item_name(item)
-        self.edit_item_price(item)
-        self.edit_item_stock(item)
-        self.edit_item_inventory(item)
+        if not self.edit_item_name(item):
+            return None
+        if not self.edit_item_price(item):
+            return None
+        if not self.edit_item_stock(item):
+            return None
+        if not self.edit_item_inventory(item):
+            return None
+
         item.trust = float("inf")
+        if not item.is_valid():
+            self.deps.output.report_warning("The created item is not valid.")
+            return None
 
         match item_type:
             case ItemType.BUY:
@@ -352,7 +365,7 @@ class Controls:
                     self.add_item()
 
                 case CommitRejectAction.EDIT:
-                    self.edit_items(run_manager.buy + run_manager.sell, sort_by=lambda i: i.name if i.name is not None else "zzz")
+                    self.edit_items(run_manager.buy + run_manager.sell, show_items=False, sort_by=lambda i: i.name if i.name is not None else "zzz")
 
                 case CommitRejectAction.DISCARD:
                     entries = {
@@ -395,17 +408,30 @@ class Controls:
 
 
     def commit_new(self, run_manager: DataRunManager):
+        container_sizes = None
+        if len(run_manager.sell):
+            container_sizes: list[ContainerSize] | None = inquirer.select(
+                message="Select available container sizes:",
+                choices=[
+                    Choice(size, name=f"{size.value:2} SCU", enabled=size.value <= self.deps.run_manager.terminal.max_container_size)
+                    for size in list(ContainerSize)
+                ],
+                multiselect=True,
+            ).execute()
+
         with Progress(transient=True) as progress:
             task_id = progress.add_task("Preprocessing...", total=None)
 
-            screenshot_fig, _ = merge_images(
-                run_manager.images,
-                [f"Screenshot {i + 1}" for i in range(len(run_manager.images))],
-                figure_size_base=(5, 8),
-            )
-            screenshot_base64 = figure_to_base64(screenshot_fig)
-            if self.deps.settings.include_screenshots and self.deps.settings.show_images:
-                plt.show()
+            screenshot_base64 = None
+            if run_manager.images:
+                screenshot_fig, _ = merge_images(
+                    run_manager.images,
+                    [f"Screenshot {i + 1}" for i in range(len(run_manager.images))],
+                    figure_size_base=(5, 8),
+                )
+                screenshot_base64 = figure_to_base64(screenshot_fig)
+                if self.deps.settings.include_screenshots and self.deps.settings.show_images:
+                    plt.show()
 
             data_run = DataRun(
                 id_terminal=run_manager.terminal.id,
@@ -413,8 +439,9 @@ class Controls:
                     *[item.create_buy_entry() for item in run_manager.buy],
                     *[item.create_sell_entry() for item in run_manager.sell],
                 ],
+                container_sizes=",".join([str(size.value) for size in container_sizes]),
                 is_production=False if self.deps.settings.dry_run else True,
-                screenshot=screenshot_base64 if self.deps.settings.include_screenshots else None,
+                screenshot=screenshot_base64 if self.deps.settings.include_screenshots and screenshot_base64 else None,
             )
 
             log.debug("submitting data run: %s", asdict(data_run, dict_factory=lambda d: {k: v for k, v in d if k != "screenshot"}))
@@ -466,8 +493,8 @@ class Controls:
                 message="Select an action:",
                 choices=[
                     Choice(Action.CHANGE_TERMINAL, name=f"Change TERMINAL ({data_run.current_terminal_name()})"),
-                    Choice(Action.PROCESS_BUY, name="Process BUY screenshot"),
-                    Choice(Action.PROCESS_SELL, name="Process SELL screenshot"),
+                    Choice(Action.PROCESS_BUY, name="Process BUY commodities (screenshot/manual)"),
+                    Choice(Action.PROCESS_SELL, name="Process SELL commodities (screenshot/manual)"),
                     *([
                         Separator(),
                         Separator(f"  There are {data_run.tracked_items} tracked items."),

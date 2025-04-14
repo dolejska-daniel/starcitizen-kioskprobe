@@ -1,26 +1,15 @@
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+
+from kiosk_probe.core.enums import InventoryAvailability
 
 log = logging.getLogger("kiosk_probe." + __name__)
 
 
-class InventoryAvailability(Enum):
-    Undetected = 0
-    OUT_OF_STOCK = 1
-    VERY_LOW_INVENTORY = 2
-    LOW_INVENTORY = 3
-    MEDIUM_INVENTORY = 4
-    HIGH_INVENTORY = 5
-    VERY_HIGH_INVENTORY = 6
-    MAX_INVENTORY = 7
-    NO_DEMAND = 8
-
-
 @dataclass
 class InventoryEntry:
-    float_pattern = re.compile(r"(?P<value>\d+(\.\d+)?)")
+    float_pattern = re.compile(r".*?(?P<value>\d+(\.\d+)?).*")
 
     entry_name: str | None = field(default=None)
     entry_availability: str | None = field(default=None)
@@ -60,8 +49,8 @@ class InventoryEntry:
             log.debug("parsed stock: %s (%s)", value, self.entry_name)
             return value
 
-        except Exception:
-            log.warning("could not parse stock from %s", text)
+        except Exception as ex:
+            log.warning("could not parse stock from %s", text, exc_info=ex)
             return None
 
     @property
@@ -70,7 +59,6 @@ class InventoryEntry:
         try:
             log.debug("parsing price from %s (%s)", text, self.entry_name)
             text = text.replace(",", "")
-            text = text.replace("/UNIT", "")
 
             value = float(self.float_pattern.match(text or "").group("value"))
             if text.endswith("K"):
@@ -83,8 +71,8 @@ class InventoryEntry:
             log.debug("parsed price: %s (%s)", value, self.entry_name)
             return value
 
-        except Exception:
-            log.warning("could not parse price from %s", text)
+        except Exception as ex:
+            log.warning("could not parse price from %s", text, exc_info=ex)
             return None
 
 

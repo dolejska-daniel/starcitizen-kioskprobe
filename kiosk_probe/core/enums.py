@@ -39,3 +39,25 @@ class ItemType(Enum):
     BUY = "buy"
     SELL = "sell"
     UNDEFINED = "undefined"
+
+
+class InventoryAvailability(Enum):
+    Undetected = 0
+    OUT_OF_STOCK = 1
+    VERY_LOW_INVENTORY = 2
+    LOW_INVENTORY = 3
+    MEDIUM_INVENTORY = 4
+    HIGH_INVENTORY = 5
+    VERY_HIGH_INVENTORY = 6
+    MAX_INVENTORY = 7
+    NO_DEMAND = 8
+
+
+class ContainerSize(Enum):
+    SCU_1 = 1
+    SCU_2 = 2
+    SCU_4 = 4
+    SCU_8 = 8
+    SCU_16 = 16
+    SCU_24 = 24
+    SCU_32 = 32
